@@ -1,0 +1,170 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Project13: Build client",
+            "type": "process",
+            "command": "D:/DevCpp/Dev-Cpp/MinGW64/bin/gcc.exe",
+            "args": [
+                "-std=c11", "-Wall", "-Wextra", "-Wpedantic", "-g", "-O0",
+                "${workspaceFolder}/client/client.c",
+                "${workspaceFolder}/client/client_logic.c",
+                "${workspaceFolder}/client/network.c",
+                "${workspaceFolder}/client/security.c",
+                "${workspaceFolder}/client/credentials.c",
+                "${workspaceFolder}/client/protocol.c",
+                "${workspaceFolder}/client/secure_channel.c",
+                "${workspaceFolder}/client/signature.c",
+                "${workspaceFolder}/client/merkle.c",
+                "${workspaceFolder}/client/operations.c",
+                "-o", "${workspaceFolder}/client/client.exe", "-lws2_32", "-lbcrypt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {"PATH": "D:\\DevCpp\\Dev-Cpp\\MinGW64\\bin;${env:PATH}"}
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+        },
+        {
+            "label": "Project13: Build client UI",
+            "type": "process",
+            "command": "D:/DevCpp/Dev-Cpp/MinGW64/bin/gcc.exe",
+            "args": [
+                "-std=c11", "-Wall", "-Wextra", "-Wpedantic", "-g", "-O0",
+                "${workspaceFolder}/client/client_gui.c",
+                "${workspaceFolder}/client/client_logic.c",
+                "${workspaceFolder}/client/network.c",
+                "${workspaceFolder}/client/security.c",
+                "${workspaceFolder}/client/credentials.c",
+                "${workspaceFolder}/client/protocol.c",
+                "${workspaceFolder}/client/secure_channel.c",
+                "${workspaceFolder}/client/signature.c",
+                "${workspaceFolder}/client/merkle.c",
+                "${workspaceFolder}/client/operations.c",
+                "-o", "${workspaceFolder}/client/client_gui.exe",
+                "-lws2_32", "-lbcrypt", "-mwindows"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {"PATH": "D:\\DevCpp\\Dev-Cpp\\MinGW64\\bin;${env:PATH}"}
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+        },
+        {
+            "label": "Project13: Build all clients",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Project13: Build client",
+                "Project13: Build client UI"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Project13: Provision credentials",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": ["${workspaceFolder}/server/provision.py"],
+            "options": {"cwd": "${workspaceFolder}", "env": {"PYTHONUTF8": "1"}},
+            "dependsOn": "Project13: Build all clients",
+            "problemMatcher": []
+        },
+        {
+            "label": "Project13: Start server",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": ["-u", "${workspaceFolder}/server/server.py"],
+            "options": {"cwd": "${workspaceFolder}", "env": {"PYTHONUTF8": "1"}},
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "project13-server",
+                "pattern": {"regexp": "^(NEVER_MATCH_PROJECT13_ERROR):(\\d+): (.*)$", "file": 1, "line": 2, "message": 3},
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^Starting server\\.\\.\\.$",
+                    "endsPattern": "^READY: listening on 127\\.0\\.0\\.1:8888$"
+                }
+            },
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true},
+            "runOptions": {"instanceLimit": 1}
+        },
+        {
+            "label": "Project13: Run client",
+            "type": "process",
+            "command": "${workspaceFolder}/client/client.exe",
+            "args": ["node-1"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {"PATH": "D:\\DevCpp\\Dev-Cpp\\MinGW64\\bin;${env:PATH}"}
+            },
+            "dependsOn": "Project13: Build client",
+            "problemMatcher": [],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+        },
+        {
+            "label": "Project13: Run node-2",
+            "type": "process",
+            "command": "${workspaceFolder}/client/client.exe",
+            "args": ["node-2"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "problemMatcher": [],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": false}
+        },
+        {
+            "label": "Project13: Run node-3",
+            "type": "process",
+            "command": "${workspaceFolder}/client/client.exe",
+            "args": ["node-3", "wrong"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "problemMatcher": [],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": false}
+        },
+        {
+            "label": "Project13: Open client UI",
+            "type": "process",
+            "command": "${workspaceFolder}/client/client_gui.exe",
+            "options": {"cwd": "${workspaceFolder}"},
+            "dependsOn": "Project13: Provision credentials",
+            "problemMatcher": [],
+            "presentation": {"reveal": "never", "panel": "dedicated"}
+        },
+        {
+            "label": "Project13: Open server UI",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": ["${workspaceFolder}/server/gui.py"],
+            "options": {"cwd": "${workspaceFolder}", "env": {"PYTHONUTF8": "1"}},
+            "dependsOn": "Project13: Provision credentials",
+            "problemMatcher": [],
+            "presentation": {"reveal": "never", "panel": "dedicated"}
+        },
+        {
+            "label": "Project13: Prepare client",
+            "dependsOrder": "sequence",
+            "dependsOn": ["Project13: Build client", "Project13: Start server"],
+            "problemMatcher": []
+        },
+        {
+            "label": "Project13: Security self-test",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": ["-u", "${workspaceFolder}/server/security_tests.py"],
+            "options": {"cwd": "${workspaceFolder}", "env": {"PYTHONUTF8": "1"}},
+            "dependsOn": "Project13: Provision credentials",
+            "problemMatcher": [],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+        },
+        {
+            "label": "Project13: Demo",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": ["-u", "${workspaceFolder}/server/demo.py"],
+            "options": {"cwd": "${workspaceFolder}", "env": {"PYTHONUTF8": "1"}},
+            "dependsOn": "Project13: Provision credentials",
+            "group": {"kind": "build", "isDefault": true},
+            "problemMatcher": [],
+            "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+        }
+    ]
+}

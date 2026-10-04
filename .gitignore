@@ -1,0 +1,32 @@
+# ===== Python =====
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== C 编译产物 =====
+*.exe
+*.o
+*.obj
+client/output/
+
+# ===== 运行时机密（绝对不能提交）=====
+client/credentials/
+client/task_public.key
+data/audit.jsonl
+data/evaluation.json
+data/node_credentials.json
+data/security_audit.jsonl
+data/security_tests.json
+data/task_private_key.json
+
+# ===== 日志 / 系统垃圾 =====
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ===== 编辑器 =====
+# .vscode/ 中的编译/调试配置建议提交；
+# 若不想提交本机路径相关的设置，取消下一行注释：
+# .vscode/settings.json

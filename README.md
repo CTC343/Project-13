@@ -7,7 +7,7 @@
 
 # 这是我的vscod里的文件，下载python3.14.6和Mingw记住地址然后给ai让它写就行
 ## Mingw需要复制bin路径到环境变量
-### 直接cmd里用cd进到要存项目的路径里然后 git clone https://github.com/CTC343/Project-13.git进行
+### 直接cmd里用cd进到要存项目的路径里然后 git clone https://github.com/CTC343/Project-13.git 就行
 
 ## 已实现功能
 

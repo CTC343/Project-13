@@ -114,14 +114,7 @@ AUTH -> AUTH_OK -> HEARTBEAT -> HEARTBEAT_ACK
 
 完整字段、状态码和安全边界见 `PROTOCOL.md`。
 
-## 手动编译
-
-```powershell
-cd F:\project13
-& 'D:\DevCpp\Dev-Cpp\MinGW64\bin\gcc.exe' -std=c11 -Wall -Wextra -Wpedantic -g -O0 .\client\client.c .\client\client_logic.c .\client\network.c .\client\security.c .\client\credentials.c .\client\protocol.c .\client\secure_channel.c .\client\signature.c .\client\merkle.c .\client\operations.c -o .\client\client.exe -lws2_32 -lbcrypt
-& '.\.venv\Scripts\python.exe' .\server\provision.py
-& '.\.venv\Scripts\python.exe' -u .\server\server.py
-```
+## 已删除手动编译部分
 
 重新编译客户端后必须再次运行 `provision.py`，使服务端程序哈希白名单与新文件一致。
 

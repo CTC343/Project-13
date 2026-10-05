@@ -2,6 +2,9 @@
 
 本项目是 Python 服务端与 Windows C 客户端组成的严格 C/S 系统。网络层、安全层和业务层相互分离，代码以流程直白、便于讲解和后续增加运算模块为目标。
 
+
+<img width="784" height="380" alt="image" src="https://github.com/user-attachments/assets/21398988-7937-44fc-b03c-2690fd76382b" />
+这是我的vscod里的文件，下载python3.14.6和Mingw记住地址然后给ai让它写就行
 ## 已实现功能
 
 - 服务端把总区间平均拆成可配置数量的子任务，并支持求和、计数、最小值、最大值。

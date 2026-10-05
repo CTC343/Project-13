@@ -4,7 +4,10 @@
 
 
 <img width="784" height="380" alt="image" src="https://github.com/user-attachments/assets/21398988-7937-44fc-b03c-2690fd76382b" />
-这是我的vscod里的文件，下载python3.14.6和Mingw记住地址然后给ai让它写就行
+
+# 这是我的vscod里的文件，下载python3.14.6和Mingw记住地址然后给ai让它写就行
+## Mingw需要复制bin路径到环境变量
+
 ## 已实现功能
 
 - 服务端把总区间平均拆成可配置数量的子任务，并支持求和、计数、最小值、最大值。

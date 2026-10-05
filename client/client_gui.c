@@ -18,6 +18,8 @@ static HWND mode_combo;
 static HWND run_button;
 static HWND log_edit;
 static HWND status_text;
+static HWND task_text;
+static HWND progress_text;
 static HWND disconnect_button;
 static HFONT ui_font;
 static HWND main_window;
@@ -33,7 +35,7 @@ static void use_ui_font(HWND control);
 static LRESULT CALLBACK window_proc(HWND window, UINT message,
                                     WPARAM w_param, LPARAM l_param);
 static DWORD WINAPI client_worker(LPVOID parameter);
-static void client_progress(int progress_code);
+static void client_progress(int progress_code, const char *detail);
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous_instance,
                    LPSTR command_line, int show_command)
@@ -119,29 +121,44 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
         switch ((int)w_param) {
         case CLIENT_PROGRESS_CONNECTING:
             SetWindowTextA(status_text, "Status: connecting...");
+            SetWindowTextA(task_text, "Task: not assigned");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_AUTHENTICATED:
             SetWindowTextA(status_text, "Status: authenticated");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_HEARTBEAT:
             SetWindowTextA(status_text, "Status: online - heartbeat OK");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_COMPUTING:
             SetWindowTextA(status_text, "Status: online - computing task");
+            SetWindowTextA(task_text, (const char *)l_param);
+            SetWindowTextA(progress_text, "Progress: 25% - task received");
             break;
         case CLIENT_PROGRESS_WAITING:
             SetWindowTextA(status_text,
                            "Status: online - waiting for task");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_BLOCKED:
             SetWindowTextA(status_text, "Status: security check blocked task");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_ERROR:
             SetWindowTextA(status_text, "Status: connection failed");
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_RECONNECTING:
             SetWindowTextA(status_text,
                            "Status: connection lost - retrying...");
+            SetWindowTextA(progress_text, (const char *)l_param);
+            break;
+        case CLIENT_PROGRESS_VERIFIED:
+        case CLIENT_PROGRESS_COMPUTED:
+        case CLIENT_PROGRESS_SUBMITTED:
+            SetWindowTextA(progress_text, (const char *)l_param);
             break;
         }
         return 0;
@@ -252,10 +269,26 @@ static void create_controls(HWND window)
     );
     use_ui_font(status_text);
 
+    task_text = CreateWindowExA(
+        0, "STATIC", "Task: not assigned",
+        WS_CHILD | WS_VISIBLE,
+        24, 178, 686, 26,
+        window, NULL, NULL, NULL
+    );
+    use_ui_font(task_text);
+
+    progress_text = CreateWindowExA(
+        0, "STATIC", "Progress: waiting for connection",
+        WS_CHILD | WS_VISIBLE,
+        24, 208, 686, 26,
+        window, NULL, NULL, NULL
+    );
+    use_ui_font(progress_text);
+
     control = CreateWindowExA(
         0, "STATIC", "Execution log",
         WS_CHILD | WS_VISIBLE,
-        24, 180, 180, 26,
+        24, 246, 180, 26,
         window, NULL, NULL, NULL
     );
     use_ui_font(control);
@@ -264,7 +297,7 @@ static void create_controls(HWND window)
         WS_EX_CLIENTEDGE, "EDIT", "",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL |
         ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-        24, 212, 686, 310,
+        24, 276, 686, 246,
         window, (HMENU)ID_LOG_EDIT, NULL, NULL
     );
     use_ui_font(log_edit);
@@ -314,7 +347,8 @@ static DWORD WINAPI client_worker(LPVOID parameter)
         );
         if (manual_stop_requested || worker_exit_code == 2) break;
 
-        client_progress(CLIENT_PROGRESS_RECONNECTING);
+        client_progress(CLIENT_PROGRESS_RECONNECTING,
+                        "Connection lost; retrying in 2 seconds");
         Sleep(2000);
     } while (!manual_stop_requested);
 
@@ -323,10 +357,10 @@ static DWORD WINAPI client_worker(LPVOID parameter)
     return 0;
 }
 
-static void client_progress(int progress_code)
+static void client_progress(int progress_code, const char *detail)
 {
-    PostMessageA(main_window, WM_CLIENT_PROGRESS,
-                 (WPARAM)progress_code, 0);
+    SendMessageA(main_window, WM_CLIENT_PROGRESS,
+                 (WPARAM)progress_code, (LPARAM)detail);
 }
 
 static void use_ui_font(HWND control)

@@ -12,8 +12,11 @@
 #define CLIENT_PROGRESS_ERROR 7
 #define CLIENT_PROGRESS_DISCONNECTED 8
 #define CLIENT_PROGRESS_RECONNECTING 9
+#define CLIENT_PROGRESS_VERIFIED 10
+#define CLIENT_PROGRESS_COMPUTED 11
+#define CLIENT_PROGRESS_SUBMITTED 12
 
-typedef void (*ClientProgressCallback)(int progress_code);
+typedef void (*ClientProgressCallback)(int progress_code, const char *detail);
 
 /*
  * 执行一次完整客户端流程。

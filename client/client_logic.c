@@ -30,9 +30,10 @@ void request_client_stop(void)
     stop_requested = 1;
 }
 
-static void report_progress(ClientProgressCallback callback, int progress_code)
+static void report_progress(ClientProgressCallback callback, int progress_code,
+                            const char *detail)
 {
-    if (callback != NULL) callback(progress_code);
+    if (callback != NULL) callback(progress_code, detail);
 }
 
 static int valid_node_id(const char *node_id)
@@ -126,6 +127,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     int simulate_wrong_result = mode != NULL && strcmp(mode, "wrong") == 0;
     int simulate_tampered_task = mode != NULL && strcmp(mode, "tamper") == 0;
     int waiting_logged = 0;
+    int completed_task = 0;
     NodeCredential credential;
     SecureSession session;
     unsigned char nonce_bytes[16];
@@ -147,6 +149,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     char merkle_root[65];
     char network_error[NETWORK_ERROR_SIZE];
     char signature_hex[513];
+    char progress_text[256];
     long range_start;
     long range_end;
     long result;
@@ -185,7 +188,8 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         add_log(log_text, log_size, "%s\r\n", network_error);
         goto cleanup;
     }
-    report_progress(progress_callback, CLIENT_PROGRESS_CONNECTING);
+    report_progress(progress_callback, CLIENT_PROGRESS_CONNECTING,
+                    "Connecting and authenticating");
     add_log(log_text, log_size, "Connection: trying server (up to 3 attempts)\r\n");
     server_socket = network_connect_retry(
         SERVER_IP, SERVER_PORT, 3, network_error, sizeof(network_error)
@@ -250,7 +254,8 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     add_log(log_text, log_size,
             "Login: authenticated; license and executable accepted\r\n");
     add_log(log_text, log_size, "Encrypted session: established\r\n");
-    report_progress(progress_callback, CLIENT_PROGRESS_AUTHENTICATED);
+    report_progress(progress_callback, CLIENT_PROGRESS_AUTHENTICATED,
+                    "Authentication passed");
 
     if (!send_heartbeat(server_socket, &session, server_body,
                         network_error, sizeof(network_error))) {
@@ -258,7 +263,8 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         goto cleanup;
     }
     add_log(log_text, log_size, "Heartbeat: acknowledged\r\n");
-    report_progress(progress_callback, CLIENT_PROGRESS_HEARTBEAT);
+    report_progress(progress_callback, CLIENT_PROGRESS_HEARTBEAT,
+                    "Online; waiting for task");
 
     while (!stop_requested) {
         if (keep_online) return_code = 1;
@@ -277,7 +283,13 @@ int run_client(const char *node_id, const char *mode, int keep_online,
                         "Online: waiting for the next task; heartbeat active\r\n");
                 waiting_logged = 1;
             }
-            report_progress(progress_callback, CLIENT_PROGRESS_WAITING);
+            report_progress(
+                progress_callback,
+                CLIENT_PROGRESS_WAITING,
+                completed_task
+                    ? "Progress: 100% - completed; waiting for next task"
+                    : "No task assigned; waiting online"
+            );
             if (retry_after < 1 || retry_after > 5) retry_after = 2;
             Sleep((DWORD)(retry_after * 1000));
             if (stop_requested) break;
@@ -300,7 +312,11 @@ int run_client(const char *node_id, const char *mode, int keep_online,
             goto cleanup;
         }
         waiting_logged = 0;
-        report_progress(progress_callback, CLIENT_PROGRESS_COMPUTING);
+        snprintf(progress_text, sizeof(progress_text),
+                 "Task %s: %s, range %ld to %ld",
+                 task_id, operation, range_start, range_end);
+        report_progress(progress_callback, CLIENT_PROGRESS_COMPUTING,
+                        progress_text);
         if (!is_operation_supported(operation) || range_start > range_end) {
             add_log(log_text, log_size, "Task validation: unsupported task.\r\n");
             goto cleanup;
@@ -315,11 +331,14 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         if (!verify_task_signature(body, signature_hex)) {
             add_log(log_text, log_size,
                     "Task signature: failed; task was not executed.\r\n");
-            report_progress(progress_callback, CLIENT_PROGRESS_BLOCKED);
+            report_progress(progress_callback, CLIENT_PROGRESS_BLOCKED,
+                            "Task signature failed; task blocked");
             return_code = 2;
             goto cleanup;
         }
         add_log(log_text, log_size, "Task signature: OK\r\n");
+        report_progress(progress_callback, CLIENT_PROGRESS_VERIFIED,
+                        "Progress: 50% - task signature verified");
 
         if (!create_result_proof(operation, range_start, range_end,
                                  simulate_wrong_result, &result,
@@ -329,6 +348,10 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         }
         add_log(log_text, log_size, "Computation: result %ld\r\n", result);
         add_log(log_text, log_size, "Merkle proof: %s\r\n", merkle_root);
+        snprintf(progress_text, sizeof(progress_text),
+                 "Progress: 75%% - computed result %ld", result);
+        report_progress(progress_callback, CLIENT_PROGRESS_COMPUTED,
+                        progress_text);
 
         snprintf(body, sizeof(body),
             "{\"action\":\"RESULT\",\"task_id\":\"%s\","
@@ -343,9 +366,16 @@ int run_client(const char *node_id, const char *mode, int keep_online,
             goto cleanup;
         }
         add_log(log_text, log_size, "Result submit: accepted\r\n");
+        report_progress(progress_callback, CLIENT_PROGRESS_SUBMITTED,
+                        "Progress: 100% - result accepted by server");
+        completed_task = 1;
         return_code = 0;
         if (!keep_online) break;
-        report_progress(progress_callback, CLIENT_PROGRESS_WAITING);
+        report_progress(
+            progress_callback,
+            CLIENT_PROGRESS_WAITING,
+            "Progress: 100% - completed; waiting for next task"
+        );
     }
 
     if (keep_online && server_socket != INVALID_SOCKET) {
@@ -355,7 +385,10 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     return_code = 0;
 
 cleanup:
-    if (return_code != 0) report_progress(progress_callback, CLIENT_PROGRESS_ERROR);
+    if (return_code != 0) {
+        report_progress(progress_callback, CLIENT_PROGRESS_ERROR,
+                        "Connection ended; retrying if enabled");
+    }
     network_close(server_socket);
     clear_sensitive(auth_text, sizeof(auth_text));
     clear_sensitive(auth_tag, sizeof(auth_tag));
@@ -363,7 +396,8 @@ cleanup:
     clear_node_credential(&credential);
     clear_secure_session(&session);
     if (return_code == 0) {
-        report_progress(progress_callback, CLIENT_PROGRESS_DISCONNECTED);
+        report_progress(progress_callback, CLIENT_PROGRESS_DISCONNECTED,
+                        "Disconnected by user");
     }
     return return_code;
 }

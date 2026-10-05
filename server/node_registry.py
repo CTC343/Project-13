@@ -9,7 +9,7 @@ class NodeRegistry:
         self._lock = threading.Lock()
         self._nodes = {}
 
-    def update(self, node_id, address, login_status, state):
+    def update(self, node_id, address, login_status, state, persistent=None):
         now = datetime.now().isoformat(timespec="seconds")
         with self._lock:
             node = self._nodes.setdefault(node_id, {})
@@ -19,6 +19,9 @@ class NodeRegistry:
                 "state": state,
                 "last_seen": now,
             })
+            if persistent is not None:
+                node["persistent"] = bool(persistent)
+            node.setdefault("persistent", False)
             if state == "heartbeat":
                 node["last_heartbeat"] = now
             node.setdefault("last_heartbeat", "-")
@@ -28,7 +31,8 @@ class NodeRegistry:
                 f"{node_id} login={snapshot['login_status']} "
                 f"state={snapshot['state']} "
                 f"heartbeat={snapshot['last_heartbeat']} "
-                f"address={snapshot['address']}",
+                f"address={snapshot['address']} "
+                f"persistent={int(snapshot['persistent'])}",
                 flush=True,
             )
 

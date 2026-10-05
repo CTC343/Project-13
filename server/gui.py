@@ -26,6 +26,18 @@ from security_audit import read_security_events
 from security_tests import create_report, read_security_test_report
 
 
+def node_is_available(login, state, persistent):
+    return (
+        persistent == "1"
+        and login == "authenticated"
+        and state != "offline"
+    )
+
+
+def missing_online_nodes(required_nodes, available_nodes):
+    return max(0, required_nodes - len(available_nodes))
+
+
 class ControlCenter:
     def __init__(self):
         self.root = tk.Tk()
@@ -37,6 +49,7 @@ class ControlCenter:
         self.process_manager = ProcessManager(self.event_queue)
 
         self.status_text = tk.StringVar(value="服务端未运行")
+        self.online_text = tk.StringVar(value="手动在线节点：0")
         self.majority_text = tk.StringVar(value="尚未完成表决")
         self.integrated_text = tk.StringVar(value="总任务结果尚未整合")
         self.malicious_text = tk.StringVar(value="尚未发现持续异常节点")
@@ -45,6 +58,8 @@ class ControlCenter:
         self.operation_inputs = {}
         self.demo_buttons = []
         self.status_rows = {}
+        self.available_nodes = set()
+        self.task_running = False
 
         self._configure_style()
         self._build_page()
@@ -70,6 +85,9 @@ class ControlCenter:
             side="left"
         )
         ttk.Label(header, textvariable=self.status_text).pack(side="right")
+        ttk.Label(header, textvariable=self.online_text).pack(
+            side="right", padx=(0, 24)
+        )
 
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True, padx=20, pady=(0, 20))
@@ -106,10 +124,10 @@ class ControlCenter:
         button_frame.pack(fill="x", pady=(0, 14))
 
         ttk.Button(
-            button_frame, text="按默认参数启动服务", command=self._start_server
+            button_frame, text="启动服务并等待客户端", command=self._start_server
         ).pack(side="left", padx=(0, 10))
         ttk.Button(
-            button_frame, text="停止服务", command=self.process_manager.stop_server
+            button_frame, text="停止服务", command=self._stop_server
         ).pack(side="left", padx=(0, 10))
 
         ttk.Button(
@@ -123,7 +141,8 @@ class ControlCenter:
             text=(
                 f"监听 {HOST}:{PORT}；任务水印格式为 "
                 f"{TASK_ID_PREFIX}-随机会话号-子任务号。"
-                "选择下面的运算并运行，留空输入项会使用括号内默认值。"
+                "先启动服务并手动连接客户端，再选择运算。"
+                "在线节点不足时不会启动任务。"
             ),
             wraplength=850,
         ).pack(anchor="w", pady=(0, 12))
@@ -182,7 +201,7 @@ class ControlCenter:
         run_button = ttk.Button(
             parent,
             text=f"运行{label}完整流程",
-            command=lambda code=operation: self._run_operation_demo(code),
+            command=lambda code=operation: self._run_operation(code),
         )
         run_button.grid(row=4, column=0, columnspan=2, sticky="w", pady=(18, 8))
         self.demo_buttons.append(run_button)
@@ -238,15 +257,38 @@ class ControlCenter:
 
         return settings
 
-    def _run_operation_demo(self, operation):
+    def _run_operation(self, operation):
         settings = self._read_operation_settings(operation)
         if settings is None:
             return
 
+        if not self.process_manager.is_server_running():
+            messagebox.showwarning(
+                "服务端未启动",
+                "请先启动服务端，再手动打开并连接客户端节点。",
+            )
+            return
+
+        required_nodes = settings["nodes_per_subtask"]
+        online_nodes = len(self.available_nodes)
+        missing_nodes = missing_online_nodes(
+            required_nodes, self.available_nodes
+        )
+        if missing_nodes > 0:
+            messagebox.showwarning(
+                "在线节点不足",
+                f"本次任务需要 {required_nodes} 个节点，"
+                f"当前只有 {online_nodes} 个手动在线节点。\n"
+                f"还缺少 {missing_nodes} 个节点，请继续打开并连接客户端。",
+            )
+            return
+
         self._clear_results()
+        self.task_running = True
         for button in self.demo_buttons:
             button.configure(state="disabled")
-        self.process_manager.restart_and_run_demo(settings)
+        self._clear_node_status()
+        self.process_manager.restart_server(settings)
 
     def _build_result_tab(self, parent):
         ttk.Label(parent, textvariable=self.majority_text,
@@ -297,17 +339,18 @@ class ControlCenter:
         ).pack(anchor="w", pady=(0, 12))
         self.node_status_table = ttk.Treeview(
             parent,
-            columns=("node", "login", "state", "heartbeat", "address"),
+            columns=("node", "mode", "login", "state", "heartbeat", "address"),
             show="headings",
             height=15,
         )
         headings = {
-            "node": "节点 ID", "login": "登录状态", "state": "当前状态",
+            "node": "节点 ID", "mode": "节点类型",
+            "login": "登录状态", "state": "当前状态",
             "heartbeat": "最近心跳", "address": "连接地址",
         }
         widths = {
-            "node": 140, "login": 150, "state": 130,
-            "heartbeat": 210, "address": 170,
+            "node": 120, "mode": 110, "login": 120, "state": 120,
+            "heartbeat": 190, "address": 150,
         }
         for name, text in headings.items():
             self.node_status_table.heading(name, text=text)
@@ -476,6 +519,21 @@ class ControlCenter:
     def _start_server(self):
         if self.process_manager.start_server():
             self._clear_results()
+            self._clear_node_status()
+
+    def _stop_server(self):
+        self.process_manager.stop_server()
+        self.task_running = False
+        for button in self.demo_buttons:
+            button.configure(state="normal")
+        self._clear_node_status()
+
+    def _clear_node_status(self):
+        self.available_nodes.clear()
+        self.online_text.set("手动在线节点：0")
+        for row_id in self.node_status_table.get_children():
+            self.node_status_table.delete(row_id)
+        self.status_rows.clear()
 
     def _clear_results(self):
         for row_id in self.result_table.get_children():
@@ -511,17 +569,15 @@ class ControlCenter:
         elif event_type == "server_stopped":
             if not self.process_manager.is_server_running():
                 self.status_text.set(event[1])
-        elif event_type == "demo_done":
-            for button in self.demo_buttons:
-                button.configure(state="normal")
-            self._refresh_audit()
-            self._refresh_evaluation()
-            self._refresh_security()
+                self.task_running = False
+                for button in self.demo_buttons:
+                    button.configure(state="normal")
+                self._clear_node_status()
 
     def _read_server_line(self, line):
-        status_match = re.match(
+        status_match = re.search(
             r"NODE_STATUS (\S+) login=(\S+) state=(\S+) "
-            r"heartbeat=(\S+) address=(\S+)", line
+            r"heartbeat=(\S+) address=(\S+) persistent=([01])", line
         )
         if status_match:
             self._set_status_value(*status_match.groups())
@@ -569,6 +625,14 @@ class ControlCenter:
             self._refresh_audit()
         elif line.startswith("Evaluation malicious ratio:"):
             self._refresh_evaluation()
+        elif "All subtask rounds complete." in line:
+            self.task_running = False
+            self.status_text.set("任务完成，客户端继续在线等待")
+            for button in self.demo_buttons:
+                button.configure(state="normal")
+            self._refresh_audit()
+            self._refresh_evaluation()
+            self._refresh_security()
 
     def _set_node_value(
         self, node_id, result=None, reputation=None, status=None
@@ -591,7 +655,9 @@ class ControlCenter:
 
         self.result_table.item(row_id, values=old_values)
 
-    def _set_status_value(self, node_id, login, state, heartbeat, address):
+    def _set_status_value(
+        self, node_id, login, state, heartbeat, address, persistent
+    ):
         translations = {
             "authenticated": "认证通过", "rejected": "认证拒绝",
             "signed_out": "已退出", "online": "在线",
@@ -599,8 +665,19 @@ class ControlCenter:
             "completed": "已提交", "offline": "离线",
             "waiting": "在线等待任务",
         }
+        is_persistent = persistent == "1"
+        is_available = node_is_available(login, state, persistent)
+        if is_available:
+            self.available_nodes.add(node_id)
+        else:
+            self.available_nodes.discard(node_id)
+        self.online_text.set(
+            f"手动在线节点：{len(self.available_nodes)}"
+        )
+
         values = (
-            node_id, translations.get(login, login),
+            node_id, "持续在线" if is_persistent else "临时节点",
+            translations.get(login, login),
             translations.get(state, state), heartbeat, address,
         )
         if node_id not in self.status_rows:

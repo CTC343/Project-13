@@ -1,10 +1,9 @@
-"""控制服务端进程、十节点演示和客户端窗口。"""
+"""控制服务端进程和用户手动打开的客户端窗口。"""
 
 import os
 import subprocess
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from config import (
@@ -14,9 +13,6 @@ from config import (
     TASK_START,
     TOTAL_ROUNDS,
 )
-from operations import operation_label
-
-
 CREATE_NO_WINDOW = 0x08000000
 
 
@@ -43,9 +39,11 @@ class ProcessManager:
 
         server_file = self.project_root / "server" / "server.py"
         settings = task_settings or self.default_task_settings()
+        task_enabled = task_settings is not None
         environment = os.environ.copy()
         environment["PYTHONUTF8"] = "1"
         environment["PROJECT13_OPERATION"] = settings["operation"]
+        environment["PROJECT13_TASK_ENABLED"] = "1" if task_enabled else "0"
         environment["PROJECT13_TASK_START"] = str(settings["start"])
         environment["PROJECT13_TASK_END"] = str(settings["end"])
         environment["PROJECT13_SUBTASK_COUNT"] = str(
@@ -90,17 +88,10 @@ class ProcessManager:
         self.server_ready.clear()
         self.event_queue.put(("status", "服务端已停止"))
 
-    def restart_and_run_demo(self, task_settings=None):
+    def restart_server(self, task_settings):
         settings = task_settings or self.default_task_settings()
         self.stop_server()
         self.start_server(settings)
-
-        worker = threading.Thread(
-            target=self._run_demo,
-            args=(settings,),
-            daemon=True,
-        )
-        worker.start()
 
     def open_client_window(self):
         client_file = self.project_root / "client" / "client_gui.exe"
@@ -130,71 +121,3 @@ class ProcessManager:
             self.event_queue.put(("server_line", line))
 
         self.event_queue.put(("server_stopped", "服务端进程已结束"))
-
-    def _run_demo(self, settings):
-        if not self.server_ready.wait(timeout=5):
-            self.event_queue.put(("status", "服务端启动超时"))
-            self.event_queue.put(("demo_done", ""))
-            return
-
-        client_file = self.project_root / "client" / "client.exe"
-        if not client_file.exists():
-            self.event_queue.put(("status", "请先编译 client.exe"))
-            self.event_queue.put(("demo_done", ""))
-            return
-
-        test_nodes = []
-        node_count = settings["nodes_per_subtask"]
-        subtask_count = settings["subtask_count"]
-
-        for node_number in range(1, node_count + 1):
-            node_id = f"node-{node_number:02d}"
-            mode = "wrong" if node_number == node_count else "normal"
-            test_nodes.append((node_id, mode))
-
-        for round_number in range(1, subtask_count + 1):
-            self.event_queue.put(
-                (
-                    "status",
-                    f"{operation_label(settings['operation'])}："
-                    f"第 {round_number}/{subtask_count} 个子任务",
-                )
-            )
-
-            def run_node(node):
-                node_id, mode = node
-                result = subprocess.run(
-                    [str(client_file), node_id, mode], cwd=self.project_root,
-                    capture_output=True, text=True, encoding="utf-8",
-                    errors="replace", creationflags=CREATE_NO_WINDOW,
-                    check=False,
-                )
-                return node_id, result
-
-            with ThreadPoolExecutor(max_workers=node_count) as workers:
-                futures = [workers.submit(run_node, node) for node in test_nodes]
-                completed_nodes = [future.result() for future in as_completed(futures)]
-
-            for node_id, completed in sorted(completed_nodes):
-                self.event_queue.put(
-                    (
-                        "client_log",
-                        f"第{round_number}轮 {node_id}",
-                        completed.stdout.strip(),
-                    )
-                )
-
-                if completed.returncode != 0:
-                    self.event_queue.put(
-                        (
-                            "status",
-                            f"{node_id} 运行失败，退出码 {completed.returncode}",
-                        )
-                    )
-                    self.event_queue.put(("demo_done", ""))
-                    return
-
-        self.event_queue.put(
-            ("status", f"{operation_label(settings['operation'])}演示已完成")
-        )
-        self.event_queue.put(("demo_done", ""))

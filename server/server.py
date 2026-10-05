@@ -9,6 +9,7 @@ from config import (
     MAX_CONCURRENT_CLIENTS,
     PORT,
     REQUIRED_NODES,
+    TASK_ENABLED,
     TASK_END,
     TASK_OPERATION,
     TASK_START,
@@ -78,6 +79,10 @@ def main():
         )
         print(f"Subtasks: split into {TOTAL_ROUNDS} ranges", flush=True)
         print(f"Nodes per round: {REQUIRED_NODES}", flush=True)
+        print(
+            "Task mode: " + ("active" if TASK_ENABLED else "idle waiting"),
+            flush=True,
+        )
         print("Protocol: P13/1 Header + JSON Body", flush=True)
         print("Security: license, identity, integrity, encrypted session", flush=True)
         print("Concurrency: select listener + thread pool enabled", flush=True)

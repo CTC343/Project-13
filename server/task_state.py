@@ -3,7 +3,7 @@
 import uuid
 import threading
 
-from config import TASK_ID_PREFIX
+from config import TASK_ENABLED, TASK_ID_PREFIX
 
 
 class TaskState:
@@ -20,7 +20,7 @@ class TaskState:
         self.evaluation_report = {}
         self.trusted_results = []
         self.integrated_result = 0
-        self.completed = False
+        self.completed = not TASK_ENABLED
         self.assigned_nodes = set()
 
     def get_task_id(self):

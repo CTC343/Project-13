@@ -242,7 +242,10 @@ def handle_client(client_socket, client_address, task_state,
             "integrity_status": "valid",
         })
         session = SecureSession(session_id, session_key)
-        node_registry.update(node_id, address_text, "authenticated", "online")
+        node_registry.update(
+            node_id, address_text, "authenticated", "online",
+            persistent=persistent,
+        )
         record_security_event("LOGIN_OK", node_id, address_text, "license and executable verified")
 
         heartbeat = _receive_secure(client_socket, session, "HEARTBEAT")

@@ -10,7 +10,7 @@ __pycache__/
 *.obj
 client/output/
 
-# ===== 运行时机密（绝对不能提交）=====
+# ===== 运行时机密 =====
 client/credentials/
 client/task_public.key
 data/audit.jsonl

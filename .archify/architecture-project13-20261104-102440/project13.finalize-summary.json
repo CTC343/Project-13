@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\candidate.json",
+    "sha256": "54460bf6ade4544dac4b23c36a26f327e0a4fe0a8c75ea672975f54b88b33f5a",
+    "bytes": 7909
+  },
+  "artifact": {
+    "path": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\project13.html",
+    "sha256": "b81039a9648835025a34ec3b8753df4032fb3e6b19cb757738152d6aacfd4b97",
+    "bytes": 820724
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\project13.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nChrome stderr:\n[25456:3388:1104/102639.342:ERROR:components\\os_crypt\\async\\browser\\os_crypt_win.cc:63] Failed to encrypt: 系统找不到指定的文件。 (0x2)\r\n[25456:3388:1104/102639.342:ERROR:net\\base\\network_change_notifier_win.cc:224] WSALookupServiceBegin failed with: -1\r\n[25456:3148:1104/102639.412:ERROR:chrome\\installer\\util\\google_update_settings_win.cc:270] Failed opening key Software\\Google\\Update\\ClientStateMedium\\{8A69D345-D564-463c-AFF1-A69D9E530F96} to set usagestats; result: 5\r\n[25456:24912:1104/102639.588:ERROR:components\\password_manager\\core\\browser\\password_store\\login_database_async_helper.cc:100] Encryption is not available.\r\n[25456:16400:1104/102639.602:ERROR:components\\password_manager\\core\\browser\\password_store\\login_database_async_helper.cc:100] Encryption is not available.\r\n[25456:3388:1104/102639.650:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:17748:1104/102639.650:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"D:\\Temp\\archify-visual-check-profile-0SoVav\\GPUPersistentCache\\DawnGraphiteCache\\NR2GNA44OGQUBFRRNDBXIX2VC7JXKYAS\", error: 0: 另一个程序正在使用此文件，进程无法访问。 (0x20)\r\n[25456:3388:1104/102639.685:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:3388:1104/102639.750:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:3148:1104/102639.750:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"D:\\Temp\\archify-visual-check-profile-0SoVav\\GPUPersistentCache\\DawnGraphiteCache\\NR2GNA44OGQUBFRRNDBXIX2VC7JXKYAS\", error: 0: 另一个程序正在使用此文件，进程无法访问。 (0x20)\r\n[25456:3388:1104/102639.762:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:3388:1104/102639.774:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:27452:1104/102639.774:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"D:\\Temp\\archify-visual-check-profile-0SoVav\\GPUPersistentCache\\DawnGraphiteCache\\NR2GNA44OGQUBFRRNDBXIX2VC7JXKYAS\", error: 0: 另一个程序正在使用此文件，进程无法访问。 (0x20)\r\n[25456:3388:1104/102639.785:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1043] GPU process exited unexpectedly: exit_code=-1073741790\r\n[25456:3388:1104/102639.785:FATAL:content\\browser\\gpu\\gpu_data_manager_impl_private.cc:389] GPU process isn't usable. Goodbye.\nChrome transport: Node v22.20.0, libuv 1.51.0, win32; pid=25456, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=1328, messages=3, bufferedBytes=0.\nChrome write pipe: writable=false, ended=true, destroyed=false, completedWrites=3, writtenBytes=255, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\project13.finalize.json",
+    "summaryReceipt": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\project13.finalize-summary.json",
+    "browserCheckReceipt": "F:\\project13\\.archify\\architecture-project13-20261104-102440\\project13.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 7574
+}

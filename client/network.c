@@ -57,28 +57,18 @@ SOCKET network_connect(const char *server_ip, int server_port,
     return server_socket;
 }
 
-SOCKET network_connect_retry(const char *server_ip, int server_port,
-                             int attempts, char *error_text, int error_size)
+int network_send_all(SOCKET server_socket, const char *message,
+                     char *error_text, int error_size)
 {
-    SOCKET server_socket = INVALID_SOCKET;
-    int attempt;
-    for (attempt = 1; attempt <= attempts; attempt++) {
-        server_socket = network_connect(
-            server_ip, server_port, error_text, error_size
-        );
-        if (server_socket != INVALID_SOCKET) return server_socket;
-        if (attempt < attempts) Sleep((DWORD)(250 * attempt));
-    }
-    return INVALID_SOCKET;
-}
-
-int network_send_bytes(SOCKET server_socket, const char *message,
-                       int message_length, char *error_text, int error_size)
-{
+    int message_length = (int)strlen(message);
     int sent_length = 0;
+
     while (sent_length < message_length) {
-        int sent_now = send(server_socket, message + sent_length,
-                            message_length - sent_length, 0);
+        int sent_now = send(server_socket,
+                            message + sent_length,
+                            message_length - sent_length,
+                            0);
+
         if (sent_now == SOCKET_ERROR || sent_now == 0) {
             snprintf(error_text, error_size,
                      "send failed: %d", WSAGetLastError());
@@ -87,13 +77,6 @@ int network_send_bytes(SOCKET server_socket, const char *message,
         sent_length += sent_now;
     }
     return 1;
-}
-
-int network_send_all(SOCKET server_socket, const char *message,
-                     char *error_text, int error_size)
-{
-    return network_send_bytes(server_socket, message, (int)strlen(message),
-                              error_text, error_size);
 }
 
 int network_receive_line(SOCKET server_socket, char *line, int line_size,
@@ -105,7 +88,10 @@ int network_receive_line(SOCKET server_socket, char *line, int line_size,
         int received_now;
         char *newline;
 
-        received_now = recv(server_socket, line + received_length, 1, 0);
+        received_now = recv(server_socket,
+                            line + received_length,
+                            line_size - 1 - received_length,
+                            0);
 
         if (received_now == SOCKET_ERROR) {
             snprintf(error_text, error_size,
@@ -121,6 +107,7 @@ int network_receive_line(SOCKET server_socket, char *line, int line_size,
         received_length += received_now;
         line[received_length] = '\0';
         newline = strchr(line, '\n');
+
         if (newline != NULL) {
             *newline = '\0';
             return 1;
@@ -129,28 +116,6 @@ int network_receive_line(SOCKET server_socket, char *line, int line_size,
 
     snprintf(error_text, error_size, "Reply is too long.");
     return 0;
-}
-
-int network_receive_exact(SOCKET server_socket, char *data, int data_size,
-                          char *error_text, int error_size)
-{
-    int received_length = 0;
-    while (received_length < data_size) {
-        int received_now = recv(server_socket, data + received_length,
-                                data_size - received_length, 0);
-        if (received_now == SOCKET_ERROR) {
-            snprintf(error_text, error_size,
-                     "recv failed: %d", WSAGetLastError());
-            return 0;
-        }
-        if (received_now == 0) {
-            snprintf(error_text, error_size,
-                     "Server closed before complete body.");
-            return 0;
-        }
-        received_length += received_now;
-    }
-    return 1;
 }
 
 void network_close(SOCKET server_socket)

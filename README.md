@@ -2,6 +2,13 @@
 
 本项目是 Python 服务端与 Windows C 客户端组成的严格 C/S 系统。网络层、安全层和业务层相互分离，代码以流程直白、便于讲解和后续增加运算模块为目标。
 
+
+<img width="784" height="380" alt="image" src="https://github.com/user-attachments/assets/21398988-7937-44fc-b03c-2690fd76382b" />
+
+# 这是我的vscod里的文件，下载python3.14.6和Mingw记住地址然后给ai让它写就行
+## Mingw需要复制bin路径到环境变量
+### 直接cmd里用cd进到要存项目的路径里然后 git clone https://github.com/CTC343/Project-13.git 就行
+
 ## 已实现功能
 
 - 服务端把总区间平均拆成可配置数量的子任务，并支持求和、计数、最小值、最大值。
@@ -107,14 +114,7 @@ AUTH -> AUTH_OK -> HEARTBEAT -> HEARTBEAT_ACK
 
 完整字段、状态码和安全边界见 `PROTOCOL.md`。
 
-## 手动编译
-
-```powershell
-cd F:\project13
-& 'D:\DevCpp\Dev-Cpp\MinGW64\bin\gcc.exe' -std=c11 -Wall -Wextra -Wpedantic -g -O0 .\client\client.c .\client\client_logic.c .\client\network.c .\client\security.c .\client\credentials.c .\client\protocol.c .\client\secure_channel.c .\client\signature.c .\client\merkle.c .\client\operations.c -o .\client\client.exe -lws2_32 -lbcrypt
-& '.\.venv\Scripts\python.exe' .\server\provision.py
-& '.\.venv\Scripts\python.exe' -u .\server\server.py
-```
+## 已删除手动编译部分
 
 重新编译客户端后必须再次运行 `provision.py`，使服务端程序哈希白名单与新文件一致。
 

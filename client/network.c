@@ -14,15 +14,13 @@ int network_start(char *error_text, int error_size)
 
     error_code = WSAStartup(MAKEWORD(2, 2), &winsock_data);
     if (error_code != 0) {
-        snprintf(error_text, error_size,
-                 "WSAStartup failed: %d", error_code);
+        snprintf(error_text, error_size, "WSAStartup failed: %d", error_code);
         return 0;
     }
     return 1;
 }
 
-SOCKET network_connect(const char *server_ip, int server_port,
-                       char *error_text, int error_size)
+SOCKET network_connect(const char *server_ip, int server_port, char *error_text, int error_size)
 {
     SOCKET server_socket;
     struct sockaddr_in server_address = {0};
@@ -30,26 +28,21 @@ SOCKET network_connect(const char *server_ip, int server_port,
 
     server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server_socket == INVALID_SOCKET) {
-        snprintf(error_text, error_size,
-                 "socket failed: %d", WSAGetLastError());
+        snprintf(error_text, error_size, "socket failed: %d", WSAGetLastError());
         return INVALID_SOCKET;
     }
 
-    setsockopt(server_socket, SOL_SOCKET, SO_RCVTIMEO,
-               (const char *)&timeout, sizeof(timeout));
-    setsockopt(server_socket, SOL_SOCKET, SO_SNDTIMEO,
-               (const char *)&timeout, sizeof(timeout));
+    //发送和接收超时设置
+    setsockopt(server_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+    setsockopt(server_socket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout));
 
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(server_port);
     server_address.sin_addr.s_addr = inet_addr(server_ip);
 
-    if (connect(server_socket,
-                (struct sockaddr *)&server_address,
-                sizeof(server_address)) == SOCKET_ERROR) {
-        snprintf(error_text, error_size,
-                 "connect failed: %d. Start server first.",
-                 WSAGetLastError());
+    if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) == SOCKET_ERROR)
+    {
+        snprintf(error_text, error_size, "connect failed: %d. Start server first.", WSAGetLastError());
         closesocket(server_socket);
         return INVALID_SOCKET;
     }
@@ -57,8 +50,7 @@ SOCKET network_connect(const char *server_ip, int server_port,
     return server_socket;
 }
 
-int network_send_all(SOCKET server_socket, const char *message,
-                     char *error_text, int error_size)
+int network_send_all(SOCKET server_socket, const char *message, char *error_text, int error_size)
 {
     int message_length = (int)strlen(message);
     int sent_length = 0;
@@ -70,8 +62,7 @@ int network_send_all(SOCKET server_socket, const char *message,
                             0);
 
         if (sent_now == SOCKET_ERROR || sent_now == 0) {
-            snprintf(error_text, error_size,
-                     "send failed: %d", WSAGetLastError());
+            snprintf(error_text, error_size, "send failed: %d", WSAGetLastError());
             return 0;
         }
         sent_length += sent_now;
@@ -79,28 +70,23 @@ int network_send_all(SOCKET server_socket, const char *message,
     return 1;
 }
 
-int network_receive_line(SOCKET server_socket, char *line, int line_size,
-                         char *error_text, int error_size)
+int network_receive_line(SOCKET server_socket, char *line, int line_size, char *error_text, int error_size)
 {
     int received_length = 0;
 
     while (received_length < line_size - 1) {
         int received_now;
         char *newline;
-
-        received_now = recv(server_socket,
-                            line + received_length,
-                            line_size - 1 - received_length,
-                            0);
+        // 接收数据直到遇到换行符或缓冲区满
+        received_now = recv(server_socket, line + received_length, line_size - 1 - received_length, 0);
 
         if (received_now == SOCKET_ERROR) {
-            snprintf(error_text, error_size,
-                     "recv failed: %d", WSAGetLastError());
+            snprintf(error_text, error_size, "recv failed: %d", WSAGetLastError());
             return 0;
         }
+
         if (received_now == 0) {
-            snprintf(error_text, error_size,
-                     "Server closed before a complete reply.");
+            snprintf(error_text, error_size, "Server closed before a complete reply.");
             return 0;
         }
 

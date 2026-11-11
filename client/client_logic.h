@@ -23,9 +23,7 @@ typedef void (*ClientProgressCallback)(int progress_code, const char *detail);
  * mode 可使用 normal、wrong 或 tamper。
  * 返回 0 表示成功，1 表示通信失败，2 表示任务认证失败。
  */
-int run_client(const char *node_id, const char *mode, int keep_online,
-               ClientProgressCallback progress_callback,
-               char *log_text, int log_size);
+int run_client(const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size);
 void request_client_stop(void);
 
 #endif

@@ -1,0 +1,653 @@
+{
+  "review_date": "2026-11-11",
+  "runtime": "3.12.14",
+  "tests": [
+    {
+      "name": "安全会话往返",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "密文篡改拦截",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "会话序号重放拦截",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "身份伪造拦截",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "登录随机数重放拦截",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "连续协议帧解析",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "超长消息拒绝",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "现有客户端文件白名单",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "RSA任务签名",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "危险函数规则扫描",
+      "passed": true,
+      "detail": "通过"
+    },
+    {
+      "name": "Python服务端语法",
+      "passed": true,
+      "detail": "22个Python模块语法通过"
+    },
+    {
+      "name": "默认区间拆分",
+      "passed": true,
+      "detail": "[(1, 200), (201, 400), (401, 600), (601, 800), (801, 1000)]"
+    },
+    {
+      "name": "四类运算与合并",
+      "passed": true,
+      "detail": "四类运算的Python参考计算与合并均符合标准答案"
+    },
+    {
+      "name": "严格多数边界",
+      "passed": true,
+      "detail": "2比1有多数，2比2无多数"
+    },
+    {
+      "name": "Merkle一致性及边界",
+      "passed": true,
+      "detail": "正确证明通过；仅改总值被拒；自洽错误仍通过证明层，需多数表决"
+    },
+    {
+      "name": "五轮信誉和资格筛选",
+      "passed": true,
+      "detail": "正确节点85分，错误节点0分，第5次错误识别，资格名单排除错误节点"
+    },
+    {
+      "name": "主动分段发包",
+      "passed": true,
+      "detail": "分四段发送Header与Body，Python接收端正确重组"
+    }
+  ],
+  "history": [
+    {
+      "session": "task-170601b1",
+      "records": 5,
+      "first": "2026-09-27T13:21:45",
+      "last": "2026-09-27T13:21:46",
+      "operation": "未记录",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        20100,
+        60100,
+        100100,
+        140100,
+        180100
+      ],
+      "integrated": 500500,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 0.36,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-1f1035d5",
+      "records": 5,
+      "first": "2026-09-27T18:07:38",
+      "last": "2026-09-27T18:07:39",
+      "operation": "未记录",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        20100,
+        60100,
+        100100,
+        140100,
+        180100
+      ],
+      "integrated": 500500,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 0.45,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-9ce4d4c4",
+      "records": 6,
+      "first": "2026-09-27T18:38:14",
+      "last": "2026-09-27T18:38:15",
+      "operation": "MAX_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "trusted": [
+        115,
+        282,
+        449,
+        615,
+        782,
+        949
+      ],
+      "integrated": 949,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "MAX_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 0.21,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-4668177d",
+      "records": 5,
+      "first": "2026-10-04T21:22:45",
+      "last": "2026-10-04T21:22:45",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        20100,
+        60100,
+        100100,
+        140100,
+        180100
+      ],
+      "integrated": 500500,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 0.31,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-bf9442fc",
+      "records": 1,
+      "first": "2026-10-04T21:27:47",
+      "last": "2026-10-04T21:27:47",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1
+      ],
+      "trusted": [
+        210
+      ],
+      "integrated": 210,
+      "nodes": 3,
+      "malicious": [],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 331.45,
+        "security_overhead_passed": false,
+        "malicious_ratio_percent": 0.0,
+        "malicious_detection_passed": false
+      }
+    },
+    {
+      "session": "task-1caf2a94",
+      "records": 5,
+      "first": "2026-10-04T21:35:27",
+      "last": "2026-10-04T21:35:28",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        20100,
+        60100,
+        100100,
+        140100,
+        180100
+      ],
+      "integrated": 500500,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 11.29,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-8202f04c",
+      "records": 5,
+      "first": "2026-10-04T22:09:08",
+      "last": "2026-10-04T22:09:08",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 12.18,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-de5aa731",
+      "records": 5,
+      "first": "2026-10-04T22:10:50",
+      "last": "2026-10-04T22:10:50",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 11.67,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-e9ae07f2",
+      "records": 5,
+      "first": "2026-10-04T22:20:00",
+      "last": "2026-10-04T22:20:00",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 5,
+      "malicious": [
+        "node-05"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 18.38,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 20.0,
+        "malicious_detection_passed": false
+      }
+    },
+    {
+      "session": "task-389a56ae",
+      "records": 5,
+      "first": "2026-10-04T22:20:15",
+      "last": "2026-10-04T22:20:15",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 5,
+      "malicious": [
+        "node-05"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 10.09,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 20.0,
+        "malicious_detection_passed": false
+      }
+    },
+    {
+      "session": "task-65f81f4c",
+      "records": 3,
+      "first": "2026-10-04T22:31:18",
+      "last": "2026-10-04T22:31:18",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3
+      ],
+      "trusted": [
+        139169586,
+        417492075,
+        695864614
+      ],
+      "integrated": 1252526275,
+      "nodes": 3,
+      "malicious": [],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 9.61,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 0.0,
+        "malicious_detection_passed": false
+      }
+    },
+    {
+      "session": "task-ab48aa13",
+      "records": 5,
+      "first": "2026-10-04T22:41:11",
+      "last": "2026-10-04T22:41:12",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 10,
+      "malicious": [
+        "node-10"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 9.48,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 10.0,
+        "malicious_detection_passed": true
+      }
+    },
+    {
+      "session": "task-66654387",
+      "records": 5,
+      "first": "2026-10-05T11:32:40",
+      "last": "2026-10-05T11:32:41",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 5,
+      "malicious": [
+        "node-05"
+      ],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 9.94,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 20.0,
+        "malicious_detection_passed": false
+      }
+    },
+    {
+      "session": "task-8d390faa",
+      "records": 5,
+      "first": "2026-10-14T17:09:37",
+      "last": "2026-10-14T17:09:44",
+      "operation": "SUM_RANGE",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "trusted": [
+        50105055,
+        150305155,
+        250505255,
+        350705355,
+        450905455
+      ],
+      "integrated": 1252526275,
+      "nodes": 10,
+      "malicious": [],
+      "evaluation": {
+        "operation": "SUM_RANGE",
+        "accuracy_error_percent": 0.0,
+        "accuracy_passed": true,
+        "security_overhead_percent": 9.32,
+        "security_overhead_passed": true,
+        "malicious_ratio_percent": 0.0,
+        "malicious_detection_passed": false
+      }
+    }
+  ],
+  "historical_security": {
+    "generated_at": "2026-10-05T11:42:27",
+    "passed": 10,
+    "total": 10,
+    "all_passed": true,
+    "results": [
+      {
+        "name": "安全会话加解密",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "消息篡改拦截",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "会话重放拦截",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "伪造节点身份拦截",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "登录随机数重放拦截",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "TCP 粘包/拆包处理",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "非法超长输入拦截",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "客户端程序完整性",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "RSA-2048 任务签名",
+        "passed": true,
+        "detail": "防护生效"
+      },
+      {
+        "name": "危险 C 函数静态扫描",
+        "passed": true,
+        "detail": "防护生效"
+      }
+    ]
+  },
+  "current_evaluation": {
+    "operation": "SUM_RANGE",
+    "accuracy_error_percent": 0.0,
+    "accuracy_passed": true,
+    "security_overhead_percent": 9.32,
+    "security_overhead_passed": true,
+    "malicious_ratio_percent": 0.0,
+    "malicious_detection_passed": false
+  },
+  "hashes": {
+    "README.md": "fbed4b6a78c644982752155f7007d05a0a9c59dc1addc102666e487cd2aacd8d",
+    "PROTOCOL.md": "2a50715b471ccfa14e258bdabb89953b485d930de153f6cfc1a80a3c2caebb71",
+    "ENVIRONMENT.md": "ea211f76c21b73c98ae673d700f0e3af49d19b695dc09fccc9e8a1f26ca3fb1a",
+    "server/config.py": "9147a8dfc7a2afb1dd1ba94e14cf8ed96ab026ab29e9064363ca5e243d3e588d",
+    "server/protocol.py": "9ff10abef9a63c1a733f9a5c5fe8decf5b20b26ef33f25d3d6dde36ccecf2f5f",
+    "server/credential_store.py": "61d5f8717eb2d3495fe91d86c8dd6d5ab8312cc5bcf648ecdc9060aca6fe4469",
+    "server/secure_channel.py": "7d5c2bb68192ca6c0d2021e65ef77f1f246e6ccb453a4a036657b8f03140a095",
+    "server/task_service.py": "5181ce370b72d980ec9b39042002db57555f34637d4daf59b2c3e43f4537eb0f",
+    "server/task_planner.py": "20fb035fc0bfce2bfa3b463c30c166e0e19f53a9fb7fc38d375bf9bb27e12436",
+    "server/task_state.py": "f84535d0461a23aaada131731029ebe3a990f64a7b099f9703fafe6885f582bd",
+    "server/operations.py": "78a9173190dace7b1294d31dba8e5acc7c42cbdf09ac53ac55526b5766e7323d",
+    "server/merkle.py": "2925cc3c6622b6d0b79d8239cb9919f03e8a374fd0a5a59a77f53d0bc8f61e19",
+    "server/evaluation.py": "40f7972f761b9b1d799743694601a9edbf3fa97e4a602ec6770eaadcaf515510",
+    "client/network.c": "e65ff620f20f9e6643683ae8a7491c69601f47d7d6293279bf99d2c6fc7b8a72",
+    "client/network.h": "9357aac06f646bc7fb2fc447f99e2257d372f2425f8a517637afd530d019d7c6",
+    "client/protocol.c": "c56221f2e58f282459f703b24ab326bdf5ce8bb89fcf4b3a43f214b74f9a30a4",
+    "data/audit.jsonl": "e14d07763eb51968b07a4c48435a7533d3c00e9ca99628c52295edc13c33d2e8",
+    "data/security_tests.json": "6e6f87eea94a1d5a08abe59343166e11e18133e6505862f1f5fd14fa028bb031",
+    "data/evaluation.json": "ff67912f5da027824567adae40ecb5c1923f659664e43464bcb3dd3394b5c474"
+  }
+}

@@ -20,8 +20,7 @@ static int read_value(FILE *file, const char *name, char *value, int value_size)
     return 0;
 }
 
-static int executable_directory(char *directory, int directory_size,
-                                char *executable, int executable_size)
+static int executable_directory(char *directory, int directory_size, char *executable, int executable_size)
 {
     char *separator;
     DWORD length = GetModuleFileNameA(NULL, executable, executable_size);
@@ -52,25 +51,30 @@ int load_node_credential(const char *node_id, NodeCredential *credential,
     snprintf(path, sizeof(path), "%s\\credentials\\%s.cred", directory, node_id);
     file = fopen(path, "r");
     if (file == NULL) {
-        snprintf(error_text, error_size,
-                 "Credential not found for %s. Start/provision server first.", node_id);
+        snprintf(error_text, error_size, "Credential not found for %s. Start/provision server first.", node_id);
         return 0;
     }
-    if (fgets(header, sizeof(header), file) == NULL ||
-        strncmp(header, "PROJECT13-CREDENTIAL-V1", 23) != 0) {
+
+    if (fgets(header, sizeof(header), file) == NULL || strncmp(header, "PROJECT13-CREDENTIAL-V1", 23) != 0) {
         fclose(file);
         snprintf(error_text, error_size, "Credential format is invalid.");
         return 0;
     }
-    if (!read_value(file, "node_id", credential->node_id,
-                    sizeof(credential->node_id))) goto invalid;
-    rewind(file); fgets(header, sizeof(header), file);
-    if (!read_value(file, "license_id", credential->license_id,
-                    sizeof(credential->license_id))) goto invalid;
-    rewind(file); fgets(header, sizeof(header), file);
-    if (!read_value(file, "expires", credential->expires,
-                    sizeof(credential->expires))) goto invalid;
-    rewind(file); fgets(header, sizeof(header), file);
+    if (!read_value(file, "node_id", credential->node_id, sizeof(credential->node_id))) goto invalid;
+    
+    rewind(file); 
+    fgets(header, sizeof(header), file);
+    
+    if (!read_value(file, "license_id", credential->license_id, sizeof(credential->license_id))) goto invalid;
+    
+    rewind(file); 
+    fgets(header, sizeof(header), file);
+    
+    if (!read_value(file, "expires", credential->expires, sizeof(credential->expires))) goto invalid;
+    
+    rewind(file);
+    fgets(header, sizeof(header), file);
+    
     if (!read_value(file, "auth_key", key_hex, sizeof(key_hex))) goto invalid;
     fclose(file);
 

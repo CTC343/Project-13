@@ -55,6 +55,7 @@ int network_send_all(SOCKET server_socket, const char *message, char *error_text
     int message_length = (int)strlen(message);
     int sent_length = 0;
 
+    /* send 可能只发送部分数据；记录进度并循环，直到全部字节都发出。 */
     while (sent_length < message_length) {
         int sent_now = send(server_socket,
                             message + sent_length,
@@ -74,6 +75,7 @@ int network_receive_line(SOCKET server_socket, char *line, int line_size, char *
 {
     int received_length = 0;
 
+    /* recv 可能分段返回；持续累积 Header，直到读到换行符标记的边界。 */
     while (received_length < line_size - 1) {
         int received_now;
         char *newline;

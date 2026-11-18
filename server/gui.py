@@ -3,6 +3,7 @@
 import queue
 import os
 import re
+import subprocess
 import sys
 import tkinter as tk
 from pathlib import Path
@@ -13,6 +14,7 @@ from accounts import AccountStore
 from audit import read_rounds
 from config import (
     CLIENT_DIR,
+    DATA_DIR,
     HOST,
     INITIAL_REPUTATION,
     MALICIOUS_WRONG_ROUNDS,
@@ -930,7 +932,16 @@ def check_files():
 
 
 if __name__ == "__main__":
-    if "--check" in sys.argv:
+    check = "--check" in sys.argv
+    launcher = Path(__file__).resolve().parent.parent / "release.py"
+    # The source entry point should use the active deployment when one exists.
+    # Packaged copies run the actual UI after the launcher configures them.
+    if launcher.is_file() and (DATA_DIR / "active-release.json").is_file():
+        command = [sys.executable, "-B", str(launcher), "launch"]
+        if check:
+            command.append("--check")
+        raise SystemExit(subprocess.call(command))
+    if check:
         raise SystemExit(check_files())
 
     ControlCenter().run()

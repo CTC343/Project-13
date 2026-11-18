@@ -32,12 +32,14 @@ static HWND main_window;
 static ClientLogin login;
 static char worker_mode[16];
 static char worker_log[CLIENT_LOG_SIZE];
+static char displayed_log[CLIENT_LOG_SIZE];
 static int worker_exit_code;
 
 
 static void create_controls(HWND window);
 static void run_selected_mode(void);
 static void use_ui_font(HWND control);
+static void update_log_text(const char *text);
 static LRESULT CALLBACK window_proc(HWND window, UINT message,
                                     WPARAM w_param, LPARAM l_param);
 static DWORD WINAPI client_worker(LPVOID parameter);
@@ -133,7 +135,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
 
     case WM_CLIENT_PROGRESS:
         /* 后台工作线程通过自定义消息报告进度，由 UI 线程更新控件。 */
-        SetWindowTextA(log_edit, worker_log);
+        update_log_text(worker_log);
         switch ((int)w_param) {
         case CLIENT_PROGRESS_CONNECTING:
             SetWindowTextA(status_text, "Status: connecting...");
@@ -188,7 +190,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
         return 0;
 
     case WM_CLIENT_DONE:
-        SetWindowTextA(log_edit, worker_log);
+        update_log_text(worker_log);
         SetWindowTextA(connection_text, "Signed out");
         if (worker_exit_code == 0) {
             SetWindowTextA(status_text, "Status: disconnected");
@@ -392,7 +394,7 @@ static void run_selected_mode(void)
     EnableWindow(password_edit, FALSE);
     snprintf(worker_mode, sizeof(worker_mode), "%s", modes[selected_mode]);
     SetWindowTextA(status_text, "Status: connecting and authenticating...");
-    SetWindowTextA(log_edit, "");
+    update_log_text("");
     UpdateWindow(GetParent(run_button));
 
     /* 网络流程放到工作线程运行，避免连接和等待任务阻塞窗口消息循环。 */
@@ -440,6 +442,40 @@ static void client_progress(int progress_code, const char *detail)
     /* SendMessage 同步等待 UI 线程处理，detail 指针在调用期间保持有效。 */
     SendMessageA(main_window, WM_CLIENT_PROGRESS,
                  (WPARAM)progress_code, (LPARAM)detail);
+}
+
+static void update_log_text(const char *text)
+{
+    SCROLLINFO scroll = {sizeof(scroll), SIF_RANGE | SIF_PAGE | SIF_POS};
+    DWORD selection_start = 0, selection_end = 0;
+    LRESULT first_visible;
+    BOOL follow_tail;
+
+    /* Heartbeats can report progress without changing the log. */
+    if (strcmp(displayed_log, text) == 0) return;
+    first_visible = SendMessageA(log_edit, EM_GETFIRSTVISIBLELINE, 0, 0);
+    SendMessageA(log_edit, EM_GETSEL, (WPARAM)&selection_start, (LPARAM)&selection_end);
+    follow_tail = selection_start == selection_end &&
+        (!GetScrollInfo(log_edit, SB_VERT, &scroll) ||
+         scroll.nPos >= scroll.nMax - (int)scroll.nPage + 1);
+
+    SendMessageA(log_edit, WM_SETREDRAW, FALSE, 0);
+    if (SetWindowTextA(log_edit, text)) {
+        DWORD length = (DWORD)GetWindowTextLengthA(log_edit);
+        LRESULT visible_after_update;
+        memcpy(displayed_log, text, strlen(text) + 1);
+        if (selection_start > length) selection_start = length;
+        if (selection_end > length) selection_end = length;
+        SendMessageA(log_edit, EM_SETSEL, selection_start, selection_end);
+        if (follow_tail) {
+            SendMessageA(log_edit, EM_SCROLL, SB_BOTTOM, 0);
+        } else {
+            visible_after_update = SendMessageA(log_edit, EM_GETFIRSTVISIBLELINE, 0, 0);
+            SendMessageA(log_edit, EM_LINESCROLL, 0, first_visible - visible_after_update);
+        }
+    }
+    SendMessageA(log_edit, WM_SETREDRAW, TRUE, 0);
+    RedrawWindow(log_edit, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME);
 }
 
 static void use_ui_font(HWND control)

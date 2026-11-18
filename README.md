@@ -4,20 +4,9 @@ Python 服务端协调任务，Windows C 客户端计算。普通用户运行 `c
 
 ## 本机部署
 
-服务端部署和客户端构建需要 Windows x64、64 位 Python 3.12 或以上（带 OpenSSL 3 和 Tk）、Visual Studio Build Tools 的 C++ 桌面开发组件，以及用于签发实验室证书的 OpenSSL 3 命令行程序。可使用 Git for Windows 附带的 OpenSSL。以下命令在项目根目录运行。
+服务端部署和客户端构建需要 Windows x64、64 位 Python 3.12 或以上（带 OpenSSL 3 和 Tk）、Visual Studio Build Tools 的 C++ 桌面开发组件，以及 OpenSSL 3 命令行程序。首次部署时，先按下文[编译客户端并生成服务端证书](#1-编译客户端并生成服务端证书)，再[创建登录账号](#2-创建登录账号)。若构建时找不到 Visual Studio，把环境变量 `PROJECT13_VCVARS` 设为该安装目录下的 `VC\Auxiliary\Build\vcvars64.bat`。
 
-```powershell
-python -B build.py
-python -B server/provision.py init --openssl '<OpenSSL.exe 的安装路径>'
-python -B server/provision.py account maintainer maintainer
-python -B server/provision.py account operator operator
-python -B server/provision.py account auditor auditor
-python -B server/gui.py
-```
-
-账号命令通过交互式提示输入和确认口令，每个账号自行设置。若自动找不到 Visual Studio，令 `PROJECT13_VCVARS` 指向其 `VC\Auxiliary\Build\vcvars64.bat`。重新构建后，停服并重新执行 `init` 登记新客户端指纹。部署版的签名私钥、签发密钥和数据在受限的 `data/runtime` 中。
-
-1. 用维护员登录控制中心，点「账号管理」创建 `demo-01`、`demo-02`、`demo-03`，再点「启动服务并等待客户端」。
+1. 在项目根目录运行 `python -B .\server\gui.py`。用维护员登录控制中心，点「账号管理」创建 `demo-01`、`demo-02`、`demo-03`，再点「启动服务并等待客户端」。
 2. 从控制中心打开客户端窗口，或直接启动 `client/output/client_gui.exe`。客户端口填 `8888`，本机地址填 `127.0.0.1`。三个计算账号各开一个窗口登录。
 3. 控制中心切换到操作员，选择区间求和，设定范围 `1–1000`、子任务 `5`、每轮节点 `3`。点击运行，结果应为 `500500`。
 4. 审计员可登录查看审计和安全自检。维护员可以停服。正常关闭控制中心会受控停止它启动的服务。
@@ -49,20 +38,82 @@ python -B server/gui.py
 
 ## 本地生成的保密文件和运行数据
 
-服务器的 `data/runtime/`、本地发布目录 `releases/` 及客户端用户目录里的运行数据由各端自行维护。仓库里的下载包只分发公开的 `tls/trust.pem` 和 `task_public.key`，各部署实例使用自己生成的材料。
+以下服务器命令都在**项目根目录的 PowerShell** 里执行。`$p13OpenSsl` 示例使用 Git for Windows 附带的程序。如果你的 OpenSSL 装在其他位置，改成你的 `openssl.exe` 路径。仓库忽略 `data/runtime/`、`client/output/` 和 `releases/`。客户端的设备文件写在当前 Windows 用户目录里。
 
-| 本地路径 | 由哪一步生成 | 用途 |
-| --- | --- | --- |
-| `data/runtime/issuer/ca.key`、`tls/server.key` | `python -B server/provision.py init` 调用 OpenSSL 生成。`rotate server` 更换服务端证书和私钥。 | CA 私钥用于签发证书和吊销列表。服务端私钥用于建立 TLS 连接。旧私钥可能保存在 `issuer/retired/`。 |
-| `data/runtime/issuer/`、`tls/server.pem`、`tls/devices/` | `server/provision.py` 初始化签发目录、签发服务端证书。客户端首次登录时，`server/enrollment.py` 调用签发模块登记设备。 | 保存 CA 的签发和吊销状态、服务器证书以及已签发的设备证书。 |
-| `data/runtime/task_private_key.json` | `server/provision.py init` 调用 `server/rsa_keys.py` 首次生成。 | 服务端用它签名任务。对应的 `task_public.key` 可以放入客户端下载包。 |
-| `data/runtime/accounts.sqlite3` | `server/accounts.py` 初始化账号库。`server/provision.py account` 或控制中心「账号管理」创建账号。 | 保存账号角色、随机盐与 scrypt 口令派生值，以及已登记设备和会话摘要。 |
-| `data/runtime/tasks.sqlite3`、`runtime.log*`、`security_audit.jsonl` | `server/task_state.py`、`server/runtime_log.py`、`server/security_audit.py` 在服务运行和操作过程中写入。 | 恢复任务和信誉，保存结果、运行日志和安全审计。 |
-| `data/runtime/backups/` | `python -B release.py activate <版本>` 或 `rollback` 切换版本时由 `release.py` 生成。 | 保存升级前的数据库、密钥和签发记录，供恢复和对账。 |
-| `%LOCALAPPDATA%\Project13\Devices\*.key`、`*.pem`、`*.identity`、`*.storage` | 每台客户端首次登录时由 `client/device.c` 创建或保存，设备证书由服务器签发。 | 用于客户端双向 TLS 身份校验、节点身份恢复和本地结果加密。每台客户端用自己的设备文件。 |
-| `%LOCALAPPDATA%\Project13\*.pending`、`*.stale` | 客户端计算完成后，由 `client/outbox.c` 保存到磁盘。 | 使用设备的本地密钥加密待发和过期结果，支持断线补报和对账。 |
+### 1. 编译客户端并生成服务端证书
 
-公开信任包由 `server/provision.py init`、`rotate server` 或 `refresh-crl` 生成。吊销列表的有效期为 7 天。维护员更新吊销列表后需要同步更新下载包里的 `tls/trust.pem`。已下载的客户端也可直接替换该文件。
+首次部署时，在服务器的 PowerShell 中依次运行以下三行。
+
+```powershell
+$p13OpenSsl = 'D:\Git\mingw64\bin\openssl.exe'
+python -B .\build.py
+python -B .\server\provision.py init --openssl $p13OpenSsl
+```
+
+如果首次部署就要让同一局域网的电脑连接，用下面两行替换上面的 `init` 命令。运行 `ipconfig` 查到服务器的局域网 IPv4 地址后，按提示输入。
+
+```powershell
+$p13LanIp = Read-Host '输入服务器的局域网 IPv4 地址'
+python -B .\server\provision.py init --openssl $p13OpenSsl --server-name localhost --server-name 127.0.0.1 --server-name $p13LanIp
+```
+
+`build.py` 把两个客户端 EXE 和 DLL 放到 `client/output/`。下表列出 `provision.py init` 生成的文件及用途。
+
+| 生成位置 | 用途 |
+| --- | --- |
+| `data/runtime/issuer/ca.key`、`data/runtime/issuer/` | CA 私钥用于签证书和吊销列表。目录里还保存签发和吊销记录。 |
+| `data/runtime/tls/server.key`、`data/runtime/tls/server.pem` | 服务端 TLS 私钥和证书。默认签给 `localhost` 和 `127.0.0.1`。 |
+| `data/runtime/task_private_key.json` | `provision.py init` 调用 `server/rsa_keys.py` 生成的任务签名私钥。 |
+| `data/runtime/accounts.sqlite3` | 账号库，初始化后可用下一节的命令创建账号。 |
+| `data/runtime/tls/trust.pem`、`client/output/tls/trust.pem` | 同一份公开 CA 证书和吊销列表，用于验证服务端。 |
+| `client/output/task_public.key` | 公开的任务验签公钥，与 `trust.pem` 一起发给客户端。 |
+
+### 2. 创建登录账号
+
+运行这三条命令，分别创建维护员、操作员、审计员。每条命令都会提示输入和确认口令。
+
+```powershell
+python -B .\server\provision.py account maintainer maintainer
+python -B .\server\provision.py account operator operator
+python -B .\server\provision.py account auditor auditor
+```
+
+创建客户端账号时，运行 `python -B .\server\gui.py`，用维护员登录，点「账号管理」→「创建客户端账号」。账号角色、随机盐、scrypt 口令派生值、设备登记和会话摘要都保存在 `data/runtime/accounts.sqlite3`。
+
+### 3. 启动服务和客户端生成运行数据
+
+- **服务端。** 运行 `python -B .\server\gui.py`，登录维护员账号，点「启动服务并等待客户端」。任务、结果和信誉保存在 `data/runtime/tasks.sqlite3`。运行日志写到 `data/runtime/runtime.log`，登录和管理操作的审计写到 `data/runtime/security_audit.jsonl`。
+- **客户端。** 双击解压目录里的 `client_gui.exe`，输入服务器地址、端口、账号和口令，点「Log in and Connect」。首次登录会在 `%LOCALAPPDATA%\Project13\Devices\` 生成该设备的 `*.key`、`*.pem`、`*.identity` 和 `*.storage`，分别用于设备认证、恢复节点身份和加密待发结果。服务端把签出的设备证书保存在 `data/runtime/tls/devices/`。
+- **断线结果。** 客户端收到任务并算出结果后，由 `client/outbox.c` 把待发结果加密写到 `%LOCALAPPDATA%\Project13\` 下的 `*.pending`。过期且未获确认的结果保留为 `*.stale`，供后续对账。
+
+### 4. 生成备份
+
+先在控制中心点「停止服务」，再运行下面的命令。终端会打印 `data/runtime/backups/` 下的备份目录。
+
+```powershell
+python -B -c "import release; print(release.backup())"
+```
+
+备份包含数据库、签发记录和私钥，保留在服务器上。若要生成本地发布目录，例如 `releases/1.2.3/`，运行 `python -B .\release.py stage 1.2.3`。运行 `python -B .\release.py activate 1.2.3` 切换到该版本，或运行 `python -B .\release.py rollback` 回到上一版本，两条命令都会在切换前备份。
+
+### 5. 更新证书和客户端的 `trust.pem`
+
+只需更新吊销列表时，先停止服务，再执行这两行。
+
+```powershell
+$p13OpenSsl = 'D:\Git\mingw64\bin\openssl.exe'
+python -B .\server\provision.py refresh-crl --openssl $p13OpenSsl
+```
+
+已有服务端证书需要覆盖新 IP 时，先按上一步备份，再运行下面的命令。提示输入地址时，填 `ipconfig` 查到的服务器局域网 IPv4。
+
+```powershell
+$p13OpenSsl = 'D:\Git\mingw64\bin\openssl.exe'
+$p13LanIp = Read-Host '输入服务器的局域网 IPv4 地址'
+python -B .\server\provision.py rotate server --openssl $p13OpenSsl --server-name localhost --server-name 127.0.0.1 --server-name $p13LanIp
+```
+
+看到 `Trust bundle published` 后重启服务，把新的 `data/runtime/tls/trust.pem` 放进下载包和已发出的客户端目录，路径都是 `tls/trust.pem`。客户端重开后填写服务器实际地址。吊销列表有效期为 7 天，续期后也要同步这份文件。
 
 ## 账号与窗口预览
 
@@ -76,7 +127,7 @@ python -B server/gui.py
 
 ## 跨机器和容量
 
-用宿主机与虚拟机的隔离网段，或两台机器的私有局域网演示。服务端默认监听 `0.0.0.0`，即所有本机 IPv4 网卡。需要限制监听范围时，用 `PROJECT13_HOST` 指定服务器要监听的 IPv4。`PROJECT13_PORT` 设置业务端口，登记端口为业务端口加一。`0.0.0.0` 是服务器的监听设置，客户端填写服务器实际可达的地址。首次部署时，用 `provision.py init --server-name <地址>` 为该地址签发证书。需要同时支持本机和局域网登录时，可以多次传入 `--server-name`，分别列出 `localhost`、`127.0.0.1` 和局域网地址。
+用宿主机与虚拟机的隔离网段，或两台机器的私有局域网演示。服务端默认监听 `0.0.0.0`，即所有本机 IPv4 网卡。需要限制监听范围时，用 `PROJECT13_HOST` 指定服务器要监听的 IPv4。`PROJECT13_PORT` 设置业务端口，登记端口为业务端口加一。`0.0.0.0` 是服务器的监听设置，客户端填写服务器实际可达的地址。服务端证书要覆盖这个地址，签发命令见[首次部署](#1-编译客户端并生成服务端证书)和[更新证书](#5-更新证书和客户端的-trustpem)。
 
 `PROJECT13_MAX_CLIENTS` 默认 64，可配 3–512。它控制同时在线的业务连接容量，容量变更后重启服务。新账号和新设备可独立登记，已有登录用户从另一台机器上线时可以获得独立的设备证书。调度仍由一个服务端协调，规模上限要结合机器资源与实测负载选取。多台独立服务可以选用不同地址和运行目录，各自协调各自的任务。
 

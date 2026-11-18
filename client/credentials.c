@@ -35,13 +35,19 @@ static int executable_directory(char *directory, int directory_size, char *execu
     return 1;
 }
 
+int deployment_directory(char *directory, int capacity)
+{
+    char executable[MAX_PATH];
+    return executable_directory(directory, capacity, executable, sizeof(executable));
+}
+
+/* 从节点凭据文件读取许可证和长期认证密钥。 */
 int load_node_credential(const char *node_id, NodeCredential *credential,
                          char *error_text, int error_size)
 {
     char directory[MAX_PATH];
     char executable[MAX_PATH];
     char path[MAX_PATH];
-    char key_hex[65];
     char header[64];
     FILE *file;
 
@@ -78,20 +84,12 @@ int load_node_credential(const char *node_id, NodeCredential *credential,
     
     if (!read_value(file, "expires", credential->expires, sizeof(credential->expires))) goto invalid;
     
-    rewind(file);
-    fgets(header, sizeof(header), file);
-    
-    if (!read_value(file, "auth_key", key_hex, sizeof(key_hex))) goto invalid;
     fclose(file);
 
-    if (strcmp(node_id, credential->node_id) != 0 ||
-        !hex_to_bytes(key_hex, credential->auth_key, 32)) {
+    if (strcmp(node_id, credential->node_id) != 0) {
         snprintf(error_text, error_size, "Credential does not match node.");
-        /* 十六进制临时副本不再需要，避免密钥残留在栈内存中。 */
-        clear_sensitive(key_hex, sizeof(key_hex));
         return 0;
     }
-    clear_sensitive(key_hex, sizeof(key_hex));
     return 1;
 
 invalid:
@@ -101,6 +99,7 @@ invalid:
     return 0;
 }
 
+/* 取得当前客户端程序的哈希，用于登录时的白名单检查。 */
 int current_executable_hash(char output_hex[65],
                             char *error_text, int error_size)
 {

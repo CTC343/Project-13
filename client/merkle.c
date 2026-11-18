@@ -7,6 +7,7 @@
 
 #define STEP_COUNT 4
 
+/* 将四段结果逐层哈希，生成 Merkle 根。 */
 static int build_merkle_root(long step_sums[STEP_COUNT],
                              char merkle_root[65])
 {
@@ -39,6 +40,7 @@ static int build_merkle_root(long step_sums[STEP_COUNT],
     return sha256_hex(combined_hashes, merkle_root);
 }
 
+/* 生成总结果、四段结果和 Merkle 根，供提交结果时使用。 */
 int create_result_proof(const char *operation,
                         long range_start, long range_end,
                         int simulate_wrong_result, long *result,

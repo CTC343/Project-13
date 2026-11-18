@@ -3,28 +3,26 @@
 import json
 import threading
 from datetime import datetime
-from pathlib import Path
+from config import DATA_DIR
 
 
-AUDIT_FILE = (
-    Path(__file__).resolve().parent.parent / "data" / "security_audit.jsonl"
-)
+AUDIT_FILE = DATA_DIR / "security_audit.jsonl"
 _write_lock = threading.Lock()
 
 
+# 单独记录登录、拒绝和异常等安全事件，加锁避免并发写入相互干扰。
 def record_security_event(event, node_id="-", address="-", detail=""):
     record = {
         "time": datetime.now().isoformat(timespec="seconds"),
         "event": event,
         "node_id": node_id,
-        "address": address,
+        "address": "local" if address == "local" else "-",
         "detail": detail,
     }
     AUDIT_FILE.parent.mkdir(exist_ok=True)
     with _write_lock:
         with AUDIT_FILE.open("a", encoding="utf-8") as output:
-            json.dump(record, output, ensure_ascii=False)
-            output.write("\n")
+            output.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def read_security_events():

@@ -16,6 +16,7 @@ def text_checksum(text):
     return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest(), "big")
 
 
+# 对任务摘要按 PKCS#1 v1.5 编码，再使用 RSA 私钥签名。
 def sign_task(task_text):
     modulus, _, private_exponent, first_prime, second_prime = read_private_key()
     # RSA 模数按字节向上取整；2048 位密钥对应 256 字节签名。
@@ -29,6 +30,7 @@ def sign_task(task_text):
         raise ValueError("RSA key is too small for SHA-256 signature")
     encoded = b"\x00\x01" + b"\xff" * padding_size + b"\x00" + digest_info
     message = int.from_bytes(encoded, "big")
+    # 分别模两个素数计算，再通过中国剩余定理合并为 RSA 签名。
     first_result = pow(
         message, private_exponent % (first_prime - 1), first_prime
     )

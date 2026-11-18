@@ -1,371 +1,268 @@
-"""认证后的节点任务分发、结果校验、表决和信誉更新。"""
+"""Authenticated task distribution and result recovery over TLS."""
 
+from collections import Counter
+import json
+import re
 import socket
 import time
 
-from audit import save_round
+from accounts import ACCOUNT_ID
 from config import (
-    CORRECT_REWARD,
-    INITIAL_REPUTATION,
-    MALICIOUS_WRONG_ROUNDS,
-    REQUIRED_NODES,
-    TASK_OPERATION,
-    TOTAL_ROUNDS,
-    WRONG_PENALTY,
+    CORRECT_REWARD, IMPORTANT_TASK_MIN_REPUTATION, INITIAL_REPUTATION,
+    MALICIOUS_WRONG_ROUNDS, SOCKET_TIMEOUT_SECONDS, WRONG_PENALTY,
 )
-from evaluation import create_evaluation_report, save_evaluation_report
+from evaluation import create_evaluation_report
 from merkle import verify_result_proof
 from operations import merge_values
 from protocol import (
-    ProtocolError,
-    STATUS_CONFLICT,
-    STATUS_FORBIDDEN,
-    STATUS_OK,
-    STATUS_UNAUTHORIZED,
-    STATUS_UNPROCESSABLE,
-    receive_frame,
-    send_error,
-    send_frame,
+    ProtocolError, STATUS_CONFLICT, STATUS_FORBIDDEN, STATUS_OK,
+    STATUS_UNAUTHORIZED, STATUS_UNPROCESSABLE, receive_frame, send_error, send_frame,
 )
 from scheduler import choose_important_task_nodes
-from secure_channel import SecureSession
 from security_audit import record_security_event
 from signature import sign_task
 from task_planner import get_subtask_range
+from tls_transport import node_certificate
 
 
 def choose_majority(task_results):
-    result_counts = {}
-    # 严格多数须超过半数；偶数票数也不能把平票当成可信结果。
-    required_votes = len(task_results) // 2 + 1
-    for result_value in task_results.values():
-        result_counts[result_value] = result_counts.get(result_value, 0) + 1
-    for result_value, vote_count in result_counts.items():
-        if vote_count >= required_votes:
-            return result_value
-    return None
+    counts = Counter(task_results.values())
+    return next((value for value, count in counts.items() if count > len(task_results) // 2), None)
 
 
 def update_reputation(task_results, trusted_value, task_state):
-    for node_id, result_value in task_results.items():
-        old_score = task_state.reputation_scores.get(node_id, INITIAL_REPUTATION)
-        if result_value == trusted_value:
-            new_score = min(100, old_score + CORRECT_REWARD)
+    for node, value in task_results.items():
+        score = task_state.reputation_scores.get(node, INITIAL_REPUTATION)
+        if value == trusted_value:
+            task_state.reputation_scores[node] = min(100, score + CORRECT_REWARD)
+            task_state.wrong_rounds[node] = 0
         else:
-            new_score = max(0, old_score - WRONG_PENALTY)
-            wrong_count = task_state.wrong_rounds.get(node_id, 0) + 1
-            task_state.wrong_rounds[node_id] = wrong_count
-            print(f"Wrong rounds: {node_id} -> {wrong_count}", flush=True)
-            # 累计错误轮数达到阈值后加入恶意节点集合；正确轮次不会清零该计数。
-            if wrong_count == MALICIOUS_WRONG_ROUNDS:
-                task_state.malicious_nodes.add(node_id)
-                print(f"Malicious node detected: {node_id}", flush=True)
-        task_state.reputation_scores[node_id] = new_score
-        print(f"Reputation: {node_id} {old_score} -> {new_score}", flush=True)
-
-
-def finish_task(task_state):
-    task_results = task_state.task_results
-    print(f"Redundant results complete: {len(task_results)} nodes", flush=True)
-    for node_id, result_value in task_results.items():
-        print(f"  {node_id}: {result_value}", flush=True)
-
-    trusted_value = choose_majority(task_results)
-    if trusted_value is None:
-        print("Vote failed: no strict majority value.", flush=True)
-        save_round(task_state, None)
-        return False
-
-    print(f"Majority result: {trusted_value}", flush=True)
-    task_state.trusted_results.append(trusted_value)
-    task_state.integrated_result = merge_values(
-        TASK_OPERATION, task_state.trusted_results
-    )
-    print(f"Integrated result: {task_state.integrated_result}", flush=True)
-    update_reputation(task_results, trusted_value, task_state)
-
+            task_state.reputation_scores[node] = max(0, score - WRONG_PENALTY)
+            count = task_state.wrong_rounds.get(node, 0) + 1
+            task_state.wrong_rounds[node] = count
+            if count >= MALICIOUS_WRONG_ROUNDS:
+                task_state.malicious_nodes.add(node)
     task_state.important_task_nodes = choose_important_task_nodes(
-        task_state.reputation_scores, task_state.malicious_nodes
-    )
-    excluded_nodes = sorted(
-        node_id for node_id in task_results
-        if node_id not in task_state.important_task_nodes
-    )
-    print(
-        "Important-task eligible: "
-        + ", ".join(task_state.important_task_nodes), flush=True
-    )
-    print("Important-task excluded: " + ", ".join(excluded_nodes), flush=True)
-
-    if task_state.round_number == TOTAL_ROUNDS:
-        task_state.evaluation_report = create_evaluation_report(
-            task_state, task_state.integrated_result
-        )
-        save_evaluation_report(task_state.evaluation_report)
-        report = task_state.evaluation_report
-        print(
-            "Evaluation accuracy error: "
-            f"{report['accuracy_error_percent']:.2f}% "
-            f"{'PASS' if report['accuracy_passed'] else 'FAIL'}", flush=True
-        )
-        print(
-            "Evaluation security overhead: "
-            f"{report['security_overhead_percent']:.2f}% "
-            f"{'PASS' if report['security_overhead_passed'] else 'FAIL'}",
-            flush=True,
-        )
-        print(
-            "Evaluation malicious ratio: "
-            f"{report['malicious_ratio_percent']:.2f}% "
-            f"{'PASS' if report['malicious_detection_passed'] else 'FAIL'}",
-            flush=True,
-        )
-
-    save_round(task_state, trusted_value)
-    print(f"Audit saved: round {task_state.round_number}", flush=True)
-    return True
-
-
-def _send_secure(client_socket, session, action, status=STATUS_OK, **values):
-    payload = {"action": action}
-    payload.update(values)
-    send_frame(
-        client_socket, "SECURE", status,
-        session.protect_server_message(payload)
+        task_state.reputation_scores, task_state.malicious_nodes,
     )
 
 
-def _receive_secure(client_socket, session, expected_action):
-    payload = _receive_secure_any(client_socket, session)
-    if payload.get("action") != expected_action:
-        raise ProtocolError(f"expected {expected_action}")
+def _send_secure(client_socket, action, status=STATUS_OK, **values):
+    send_frame(client_socket, "SECURE", status, {"action": action, **values})
+
+
+def _receive_secure(client_socket):
+    message_type, status, payload = receive_frame(client_socket)
+    if message_type != "SECURE" or status != 0 or not isinstance(payload.get("action"), str):
+        raise ProtocolError("invalid business frame")
     return payload
 
 
-def _receive_secure_any(client_socket, session):
-    message_type, _, envelope = receive_frame(client_socket)
-    if message_type != "SECURE":
-        raise ProtocolError("expected secure message")
-    try:
-        payload = session.open_client_message(envelope)
-    except ValueError as error:
-        raise ProtocolError(str(error), STATUS_UNAUTHORIZED) from None
-    return payload
-
-
-def _try_reserve_task(node_id, last_round, task_state):
-    # 锁内检查并登记节点，避免并发连接给同一节点或超额节点重复派发。
-    with task_state.lock:
-        if task_state.completed:
+def _try_reserve_task(node_id, state):
+    with state.lock:
+        required = state.settings["nodes_per_subtask"]
+        if (state.completed or node_id in state.task_results or node_id in state.assigned_nodes
+                or len(state.assigned_nodes) + len(state.task_results) >= required):
             return None
-        if task_state.round_number <= last_round:
+        if state.settings["important"] and (
+            node_id in state.malicious_nodes or
+            state.reputation_scores.get(node_id, INITIAL_REPUTATION) < IMPORTANT_TASK_MIN_REPUTATION
+        ):
             return None
-        if node_id in task_state.assigned_nodes:
-            return None
-        if len(task_state.assigned_nodes) >= REQUIRED_NODES:
-            return None
+        if node_id not in state.offered_nodes:
+            with state.transaction():
+                state.offered_nodes.add(node_id)
+        state.assigned_nodes.add(node_id)
+        lower, upper = get_subtask_range(
+            state.round_number, state.settings["start"], state.settings["end"],
+            state.settings["subtask_count"],
+        )
+        return state.get_task_id(), state.settings["operation"], lower, upper
 
-        task_id = task_state.get_task_id()
-        task_start, task_end = get_subtask_range(task_state.round_number)
-        task_state.assigned_nodes.add(node_id)
-        return task_id, task_start, task_end, task_state.round_number
 
-
-def _store_result(node_id, payload, task_info, task_state):
-    task_id, _, _, _ = task_info
-    if payload.get("task_id") != task_id or payload.get("node_id") != node_id:
+def _store_result(node_id, payload, state, assigned_task=None):
+    task_id, value = payload.get("task_id"), payload.get("value")
+    root, steps = payload.get("merkle_root"), payload.get("proof_steps")
+    if not isinstance(task_id, str) or not re.fullmatch(r"task-[0-9a-f]{32}-[0-9]{3}", task_id):
+        raise ProtocolError("invalid task identity", STATUS_UNPROCESSABLE)
+    if payload.get("node_id") != node_id or (assigned_task is not None and assigned_task != task_id):
         raise ProtocolError("task or node identity does not match", STATUS_FORBIDDEN)
-    try:
-        result_value = int(payload["value"])
-        merkle_root = payload["merkle_root"]
-        proof_steps = payload["proof_steps"]
-    except (KeyError, TypeError, ValueError):
-        raise ProtocolError("invalid result body", STATUS_UNPROCESSABLE) from None
+    if (type(value) is not int or not -(2**31) <= value < 2**31 or
+            not isinstance(root, str) or not re.fullmatch(r"[0-9a-f]{64}", root) or
+            not isinstance(steps, str) or not re.fullmatch(r"-?\d{1,10}(,-?\d{1,10}){3}", steps)):
+        raise ProtocolError("invalid result format", STATUS_UNPROCESSABLE)
+    encoded = json.dumps({"value": value, "root": root, "steps": steps}, separators=(",", ":"))
+    messages = []
 
-    # 证明负责校验“分段值、总值、Merkle 根”相互一致，不单独证明计算过程真实。
-    if not verify_result_proof(
-        TASK_OPERATION, result_value, proof_steps, merkle_root
-    ):
-        raise ProtocolError("invalid Merkle proof", STATUS_UNPROCESSABLE)
+    with state.transaction() as db:
+        previous = db.execute(
+            "SELECT payload FROM results WHERE task_id = ? AND node_id = ?", (task_id, node_id)
+        ).fetchone()
+        if previous is not None:
+            if previous[0] != encoded:
+                raise ProtocolError("result differs from the durable receipt", STATUS_CONFLICT)
+            return "ACCEPTED", task_id
+        if state.completed or task_id != state.get_task_id() or node_id not in state.offered_nodes:
+            return "RETAIN", task_id
+        operation = state.settings["operation"]
+        if not verify_result_proof(operation, value, steps, root):
+            raise ProtocolError("invalid Merkle proof", STATUS_UNPROCESSABLE)
+        db.execute("INSERT INTO results VALUES (?, ?, ?)", (task_id, node_id, encoded))
+        state.task_results[node_id] = value
+        state.result_proofs[node_id] = {"root": root, "steps": steps}
+        state.assigned_nodes.discard(node_id)
+        required = state.settings["nodes_per_subtask"]
+        messages.append(f"Result {len(state.task_results)}/{required}: {node_id} -> {value}")
 
-    with task_state.lock:
-        if task_id != task_state.get_task_id():
-            raise ProtocolError("subtask is no longer active", STATUS_CONFLICT)
-        if node_id in task_state.task_results:
-            raise ProtocolError("duplicate result", STATUS_CONFLICT)
-
-        task_state.task_results[node_id] = result_value
-        task_state.result_proofs[node_id] = {
-            "root": merkle_root, "steps": proof_steps
-        }
-        result_number = len(task_state.task_results)
-        print(
-            f"Result {result_number}/{REQUIRED_NODES}: "
-            f"{node_id} -> {result_value}", flush=True
-        )
-        print(f"Merkle proof verified: {node_id}", flush=True)
-
-        if result_number == REQUIRED_NODES:
-            finish_task(task_state)
-            print(f"Round {task_state.round_number} complete.", flush=True)
-            if task_state.round_number == TOTAL_ROUNDS:
-                task_state.completed = True
-                print("All subtask rounds complete.", flush=True)
+        if len(state.task_results) == required:
+            trusted = choose_majority(state.task_results)
+            if trusted is None:
+                state.failed = state.completed = True
+                state.save_round(db, None)
+                messages.append("Vote failed: no strict majority value. Batch stopped.")
             else:
-                task_state.start_next_round()
-                print(f"Next task: {task_state.get_task_id()}", flush=True)
-        return result_value
+                old_scores = state.reputation_scores.copy()
+                old_malicious = state.malicious_nodes.copy()
+                state.trusted_results.append(trusted)
+                state.integrated_result = merge_values(operation, state.trusted_results)
+                update_reputation(state.task_results, trusted, state)
+                messages.extend((f"Majority result: {trusted}", f"Integrated result: {state.integrated_result}"))
+                for node in state.task_results:
+                    old = old_scores.get(node, INITIAL_REPUTATION)
+                    messages.append(f"Reputation: {node} {old} -> {state.reputation_scores[node]}")
+                for node in sorted(state.malicious_nodes - old_malicious):
+                    messages.append(f"Malicious node detected: {node}")
+                excluded = sorted(set(state.task_results) - set(state.important_task_nodes))
+                messages.append("Important-task excluded: " + ", ".join(excluded))
+                if state.round_number == state.settings["subtask_count"]:
+                    state.completed = True
+                    state.evaluation_report = create_evaluation_report(state, state.integrated_result)
+                state.save_round(db, trusted)
+                messages.append(f"Round {state.round_number} complete.")
+                if state.completed:
+                    messages.append("All subtask rounds complete.")
+                else:
+                    state.start_next_round()
+            messages.append(f"Audit saved: {task_id}")
+    for message in messages:
+        print(message, flush=True)
+    return "ACCEPTED", task_id
 
 
-def handle_client(client_socket, client_address, task_state,
-                  credential_store, node_registry):
-    address_text = f"{client_address[0]}:{client_address[1]}"
+def _heartbeat(socket_value, payload, registry, node_id, preview):
+    if payload["action"] != "HEARTBEAT" or type(payload.get("sent_at")) is not int or payload["sent_at"] <= 0:
+        raise ProtocolError("expected valid HEARTBEAT")
+    registry.update(node_id, "-", "authenticated", "heartbeat")
+    view_id = preview.offer(node_id, payload.get("preview_enabled") in (True, 1))
+    _send_secure(socket_value, "HEARTBEAT_ACK", server_time=int(time.time()), preview_id=view_id)
+
+
+def handle_client(client_socket, task_state, credentials, accounts, registry, initial_frame, preview):
     node_id = "-"
-    task_info = None
-    session = None
-    result_stored = False
-    persistent = False
-    last_round = 0
-    # 8 秒 socket I/O 超时，防止客户端连接后长期占住工作线程。
-    client_socket.settimeout(8)
+    claimed = False
+    signed_in = False
+    reserved_task = None
+    token = ""
+    client_socket.settimeout(SOCKET_TIMEOUT_SECONDS)
 
     try:
-        message_type, _, auth_request = receive_frame(client_socket)
-        if message_type != "AUTH":
-            raise ProtocolError("AUTH must be the first message", STATUS_UNAUTHORIZED)
-        node_id = auth_request.get("node_id", "-")
-        persistent = bool(auth_request.get("persistent", False))
-        auth_key = credential_store.authenticate(auth_request)
-        session_id, server_nonce, server_proof, session_key = (
-            credential_store.create_session(auth_key, auth_request["client_nonce"])
-        )
-        send_frame(client_socket, "AUTH_OK", STATUS_OK, {
-            "session_id": session_id,
-            "server_nonce": server_nonce,
-            "server_proof": server_proof,
-            "license_status": "valid",
-            "integrity_status": "valid",
-        })
-        session = SecureSession(session_id, session_key)
-        node_registry.update(
-            node_id, address_text, "authenticated", "online",
-            persistent=persistent,
-        )
-        record_security_event("LOGIN_OK", node_id, address_text, "license and executable verified")
+        message_type, status, auth = initial_frame
+        if message_type != "AUTH" or status != 0:
+            raise ProtocolError("expected AUTH", STATUS_UNAUTHORIZED)
+        requested_node = auth.get("node_id")
+        if not isinstance(requested_node, str) or not ACCOUNT_ID.fullmatch(requested_node):
+            raise ValueError("invalid login")
+        certificate = node_certificate(client_socket, requested_node)
+        node_id = requested_node
+        persistent = auth.get("persistent") in (True, 1)
+        username = auth.get("username")
+        credentials.verify_executable(auth.get("exe_hash"))
+        accounts.verify_device(node_id, username, auth.get("license_id"), certificate)
+        token = auth.get("token", "")
+        if token:
+            accounts.resume(token, username, node_id, certificate)
+        else:
+            encoded = auth.get("password_hex")
+            if not isinstance(encoded, str) or not re.fullmatch(r"(?:[0-9a-f]{2}){1,256}", encoded):
+                raise ValueError("invalid login")
+            accounts.verify(username, bytes.fromhex(encoded), "node")
+        auth.clear()
+        if not registry.claim(node_id):
+            raise ProtocolError("previous node connection is still closing", STATUS_CONFLICT)
+        claimed = True
+        if not token:
+            token = accounts.issue(username, node_id, certificate)
+        send_frame(client_socket, "AUTH_OK", STATUS_OK, {"token": token})
+        signed_in = True
+        registry.update(node_id, "-", "authenticated", "online", persistent=persistent)
+        record_security_event("LOGIN_OK", node_id, detail="node certificate and account accepted")
 
-        heartbeat = _receive_secure(client_socket, session, "HEARTBEAT")
-        if int(heartbeat.get("sent_at", 0)) <= 0:
-            raise ProtocolError("invalid heartbeat")
-        node_registry.update(node_id, address_text, "authenticated", "heartbeat")
-        _send_secure(client_socket, session, "HEARTBEAT_ACK", server_time=int(time.time()))
+        request = _receive_secure(client_socket)
+        if request["action"] == "RESULT":
+            action, task_id = _store_result(node_id, request, task_state)
+            _send_secure(client_socket, action, task_id=task_id)
+            record_security_event("RESULT_RECOVERY", node_id, detail=f"{action} {task_id}")
+            request = _receive_secure(client_socket)
+        if request["action"] == "LOGOUT":
+            accounts.revoke(token)
+            return
+        _heartbeat(client_socket, request, registry, node_id, preview)
 
         while True:
-            task_info = _try_reserve_task(node_id, last_round, task_state)
-            if task_info is None:
+            assignment = _try_reserve_task(node_id, task_state)
+            if assignment is None:
                 if not persistent:
-                    raise ProtocolError(
-                        "current subtask cannot accept this node",
-                        STATUS_CONFLICT,
-                    )
-
-                node_registry.update(
-                    node_id, address_text, "authenticated", "waiting"
-                )
-                with task_state.lock:
-                    all_complete = task_state.completed
-                # 每 2 秒提示客户端再次心跳；短轮询便于快速响应任务和断开请求。
-                _send_secure(
-                    client_socket, session, "WAIT",
-                    retry_after=2, all_complete=all_complete
-                )
-                control = _receive_secure_any(client_socket, session)
-                action = control.get("action")
-                if action == "LOGOUT":
-                    record_security_event(
-                        "LOGOUT", node_id, address_text, "client requested"
-                    )
+                    raise ProtocolError("no task can accept this node", STATUS_CONFLICT)
+                registry.update(node_id, "-", "authenticated", "waiting")
+                _send_secure(client_socket, "WAIT", retry_after=1, all_complete=task_state.completed)
+                request = _receive_secure(client_socket)
+                if request["action"] == "LOGOUT":
+                    accounts.revoke(token)
+                    record_security_event("LOGOUT", node_id)
                     break
-                if action != "HEARTBEAT" or int(control.get("sent_at", 0)) <= 0:
-                    raise ProtocolError("expected HEARTBEAT or LOGOUT")
-                node_registry.update(
-                    node_id, address_text, "authenticated", "heartbeat"
-                )
-                _send_secure(
-                    client_socket, session, "HEARTBEAT_ACK",
-                    server_time=int(time.time())
-                )
-                node_registry.update(
-                    node_id, address_text, "authenticated", "waiting"
-                )
+                accounts.resume(token, username, node_id, certificate)
+                _heartbeat(client_socket, request, registry, node_id, preview)
                 continue
 
-            task_id, task_start, task_end, assigned_round = task_info
-            result_stored = False
-            task_text = f"{task_id}|{TASK_OPERATION}|{task_start}|{task_end}"
-            task_signature = sign_task(task_text)
-            node_registry.update(
-                node_id, address_text, "authenticated", "computing"
-            )
-            _send_secure(
-                client_socket, session, "TASK", task_id=task_id,
-                operation=TASK_OPERATION, start=task_start, end=task_end,
-                signature=task_signature
-            )
-
-            result_payload = _receive_secure(client_socket, session, "RESULT")
-            _store_result(node_id, result_payload, task_info, task_state)
-            result_stored = True
-            last_round = assigned_round
-            _send_secure(client_socket, session, "ACCEPTED", task_id=task_id)
-            node_registry.update(
-                node_id, address_text, "authenticated",
-                "waiting" if persistent else "completed"
-            )
-            record_security_event(
-                "RESULT_ACCEPTED", node_id, address_text, task_id
-            )
-            if not persistent:
+            reserved_task, operation, lower, upper = assignment
+            signature = sign_task(f"{reserved_task}|{operation}|{lower}|{upper}")
+            registry.update(node_id, "-", "authenticated", "computing")
+            _send_secure(client_socket, "TASK", task_id=reserved_task, operation=operation,
+                         start=lower, end=upper, signature=signature)
+            request = _receive_secure(client_socket)
+            if request["action"] == "LOGOUT":
+                accounts.revoke(token)
                 break
-            task_info = None
-
-    except ValueError as error:
-        record_security_event("LOGIN_REJECTED", node_id, address_text, str(error))
-        node_registry.update(node_id, address_text, "rejected", "offline")
+            if request["action"] != "RESULT":
+                raise ProtocolError("expected RESULT")
+            action, task_id = _store_result(node_id, request, task_state, reserved_task)
+            _send_secure(client_socket, action, task_id=task_id)
+            record_security_event("RESULT_" + action, node_id, detail=task_id)
+            if not persistent:
+                accounts.revoke(token)
+                break
+    except (ValueError, ProtocolError) as error:
+        detail = str(error) if isinstance(error, ProtocolError) else "credentials or session rejected"
+        status = getattr(error, "status", STATUS_UNAUTHORIZED)
+        record_security_event("REQUEST_REJECTED" if signed_in else "LOGIN_REJECTED", node_id, detail=detail)
         try:
-            send_error(client_socket, STATUS_UNAUTHORIZED, str(error))
-        except OSError:
-            pass
-    except (ProtocolError, socket.timeout) as error:
-        detail = str(error) or "socket timeout"
-        # 未显式附带状态码的协议错误按“内容无法处理”返回 422。
-        status = getattr(error, "status", STATUS_UNPROCESSABLE)
-        record_security_event("REQUEST_REJECTED", node_id, address_text, detail)
-        try:
-            if session is None:
+            if signed_in:
+                _send_secure(client_socket, "ERROR", status, detail=detail)
+            else:
                 send_error(client_socket, status, detail)
-            else:
-                _send_secure(client_socket, session, "ERROR", status, detail=detail)
         except OSError:
             pass
-    except (OSError, UnicodeDecodeError) as error:
-        record_security_event("NETWORK_ERROR", node_id, address_text, str(error))
-        print(f"Client error: {address_text} {error}", flush=True)
+    except (OSError, socket.timeout):
+        record_security_event("CONNECTION_ENDED", node_id, detail="network interruption or timeout")
     except Exception as error:
-        record_security_event("SERVER_ERROR", node_id, address_text, str(error))
-        print(f"Unexpected client error: {address_text} {error}", flush=True)
-        try:
-            if session is None:
-                send_error(client_socket, 500, "internal server error")
-            else:
-                _send_secure(
-                    client_socket, session, "ERROR", 500,
-                    detail="internal server error"
-                )
-        except OSError:
-            pass
+        record_security_event("SERVER_ERROR", node_id, detail=type(error).__name__)
+        print(f"Client processing failed: {type(error).__name__}", flush=True)
     finally:
-        if task_info is not None and not result_stored:
+        if reserved_task is not None:
             with task_state.lock:
-                task_state.assigned_nodes.discard(node_id)
-        if node_id != "-":
-            node_registry.update(node_id, address_text, "signed_out", "offline")
+                if reserved_task == task_state.get_task_id():
+                    task_state.assigned_nodes.discard(node_id)
+        if claimed:
+            preview.offer(node_id, False)
+            registry.update(node_id, "-", "signed_out", "offline")
+            registry.release(node_id)

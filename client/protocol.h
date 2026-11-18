@@ -1,7 +1,7 @@
 #ifndef PROJECT13_PROTOCOL_H
 #define PROJECT13_PROTOCOL_H
 
-#include <winsock2.h>
+#include "network.h"
 
 /* JSON Body 缓冲区上限；接收时还需额外预留一个字节存放 '\0'。 */
 #define PROTOCOL_BODY_SIZE 8192
@@ -16,7 +16,7 @@
  * error_size: error_text 缓冲区的大小（字节）。
  * 返回值：成功返回非零，失败返回 0。
  */
-int protocol_send_frame(SOCKET server_socket, const char *message_type,
+int protocol_send_frame(NetworkConnection *connection, const char *message_type,
                         int status, const char *json_body,
                         char *error_text, int error_size);
 
@@ -32,7 +32,7 @@ int protocol_send_frame(SOCKET server_socket, const char *message_type,
  * error_size: error_text 缓冲区的大小（字节）。
  * 返回值：成功返回非零，失败返回 0。
  */
-int protocol_receive_frame(SOCKET server_socket, char *message_type,
+int protocol_receive_frame(NetworkConnection *connection, char *message_type,
                            int type_size, int *status,
                            char *json_body, int body_size,
                            char *error_text, int error_size);

@@ -1,7 +1,7 @@
 #ifndef PROJECT13_SECURITY_H
 #define PROJECT13_SECURITY_H
 
-/* 返回 64 位十六进制 SHA-256 摘要（输出缓冲区需容纳 65 字节）。 */
+/* 返回 64 个十六进制字符的 SHA-256 摘要（输出缓冲区需容纳 65 字节）。 */
 int sha256_hex(const char *message, char output_hex[65]);
 int sha256_file_hex(const char *path, char output_hex[65]);
 

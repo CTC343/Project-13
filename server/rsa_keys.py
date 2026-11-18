@@ -4,15 +4,17 @@ import json
 import math
 import secrets
 from pathlib import Path
+from config import CLIENT_DIR, DATA_DIR
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PRIVATE_KEY_FILE = PROJECT_ROOT / "data" / "task_private_key.json"
-PUBLIC_KEY_FILE = PROJECT_ROOT / "client" / "task_public.key"
+PRIVATE_KEY_FILE = DATA_DIR / "task_private_key.json"
+PUBLIC_KEY_FILE = CLIENT_DIR / "task_public.key"
 # RSA 常用公钥指数；奇数且计算高效，同时满足与 p-1、q-1 互素的条件。
 PUBLIC_EXPONENT = 65537
 
 
+# 使用 Miller-Rabin 测试筛选可能的素数。
 def _probably_prime(number, rounds=24):
     # Miller-Rabin 做 24 轮随机测试；轮数越多，合数误判为素数的概率越低。
     if number < 2 or number % 2 == 0:
@@ -36,6 +38,7 @@ def _probably_prime(number, rounds=24):
     return True
 
 
+# 随机生成 RSA 密钥所需的大素数。
 def _generate_prime(bit_count):
     while True:
         candidate = secrets.randbits(bit_count)
@@ -45,6 +48,7 @@ def _generate_prime(bit_count):
                 return candidate
 
 
+# 复用已有 RSA 密钥，或首次生成并分别保存公钥和私钥。
 def ensure_task_signing_keys():
     if PRIVATE_KEY_FILE.exists() and PUBLIC_KEY_FILE.exists():
         try:
@@ -69,7 +73,8 @@ def ensure_task_signing_keys():
         (first_prime - 1) * (second_prime - 1)
     )
 
-    PRIVATE_KEY_FILE.parent.mkdir(exist_ok=True)
+    PRIVATE_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PUBLIC_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
     PRIVATE_KEY_FILE.write_text(json.dumps({
         "modulus": format(modulus, "x"),
         "public_exponent": PUBLIC_EXPONENT,
@@ -85,8 +90,8 @@ def ensure_task_signing_keys():
     )
 
 
+# 读取服务端私钥，供任务签名使用。
 def read_private_key():
-    ensure_task_signing_keys()
     record = json.loads(PRIVATE_KEY_FILE.read_text(encoding="ascii"))
     return (
         int(record["modulus"], 16),

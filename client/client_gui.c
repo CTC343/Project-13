@@ -3,8 +3,12 @@
 #include <stdio.h>
 
 #include "client_logic.h"
+#include "preview.h"
+#include "security.h"
+#include "watchdog.h"
+#include <string.h>
+#include <stdlib.h>
 
-#define ID_NODE_EDIT 101
 #define ID_MODE_COMBO 102
 #define ID_RUN_BUTTON 103
 #define ID_LOG_EDIT 104
@@ -13,21 +17,23 @@
 #define WM_CLIENT_DONE (WM_APP + 1)
 #define WM_CLIENT_PROGRESS (WM_APP + 2)
 
-static HWND node_edit;
+static HWND server_edit, port_edit, username_edit, password_edit;
+static HANDLE stop_event;
 static HWND mode_combo;
 static HWND run_button;
 static HWND log_edit;
 static HWND status_text;
+static HWND connection_text;
 static HWND task_text;
 static HWND progress_text;
 static HWND disconnect_button;
 static HFONT ui_font;
 static HWND main_window;
-static char worker_node[64];
+static ClientLogin login;
 static char worker_mode[16];
 static char worker_log[CLIENT_LOG_SIZE];
 static int worker_exit_code;
-static volatile int manual_stop_requested;
+
 
 static void create_controls(HWND window);
 static void run_selected_mode(void);
@@ -46,7 +52,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous_instance,
     MSG message;
 
     (void)previous_instance;
-    (void)command_line;
+    if (strcmp(command_line, "--window") != 0) return run_watchdog(show_command);
+    stop_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!stop_event) return 1;
 
     window_class.lpfnWndProc = window_proc;
     window_class.hInstance = instance;
@@ -68,7 +76,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous_instance,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         760,
-        580,
+        680,
         NULL,
         NULL,
         instance,
@@ -110,11 +118,17 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
             run_selected_mode();
         } else if (LOWORD(w_param) == ID_DISCONNECT_BUTTON &&
                    HIWORD(w_param) == BN_CLICKED) {
-            manual_stop_requested = 1;
+            SetEvent(stop_event);
             request_client_stop();
             EnableWindow(disconnect_button, FALSE);
             SetWindowTextA(status_text, "Status: disconnecting...");
+        } else {
+            preview_handle_command(w_param);
         }
+        return 0;
+
+    case WM_PREVIEW_STATUS:
+        preview_update_status();
         return 0;
 
     case WM_CLIENT_PROGRESS:
@@ -123,12 +137,19 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
         switch ((int)w_param) {
         case CLIENT_PROGRESS_CONNECTING:
             SetWindowTextA(status_text, "Status: connecting...");
+            SetWindowTextA(connection_text, "Authenticating with the server");
             SetWindowTextA(task_text, "Task: not assigned");
             SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_AUTHENTICATED:
             SetWindowTextA(status_text, "Status: authenticated");
-            SetWindowTextA(progress_text, (const char *)l_param);
+            {
+                wchar_t details[256];
+                if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (const char *)l_param, -1,
+                                        details, _countof(details)) > 0) {
+                    SetWindowTextW(connection_text, details);
+                }
+            }
             break;
         case CLIENT_PROGRESS_HEARTBEAT:
             SetWindowTextA(status_text, "Status: online - heartbeat OK");
@@ -153,6 +174,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
             SetWindowTextA(progress_text, (const char *)l_param);
             break;
         case CLIENT_PROGRESS_RECONNECTING:
+            SetWindowTextA(connection_text, "Offline");
             SetWindowTextA(status_text,
                            "Status: connection lost - retrying...");
             SetWindowTextA(progress_text, (const char *)l_param);
@@ -167,21 +189,26 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
 
     case WM_CLIENT_DONE:
         SetWindowTextA(log_edit, worker_log);
+        SetWindowTextA(connection_text, "Signed out");
         if (worker_exit_code == 0) {
             SetWindowTextA(status_text, "Status: disconnected");
         } else if (worker_exit_code == 2) {
-            SetWindowTextA(status_text, "Status: security check blocked the task");
+            SetWindowTextA(status_text, "Status: sign-in or security check failed");
         } else {
             SetWindowTextA(status_text, "Status: failed - check the log");
         }
         EnableWindow(run_button, TRUE);
         EnableWindow(disconnect_button, FALSE);
-        EnableWindow(node_edit, TRUE);
+        EnableWindow(server_edit, TRUE);
+        EnableWindow(port_edit, TRUE);
+        EnableWindow(username_edit, TRUE);
+        EnableWindow(password_edit, TRUE);
         EnableWindow(mode_combo, TRUE);
         return 0;
 
     case WM_DESTROY:
-        manual_stop_requested = 1;
+        preview_shutdown();
+        SetEvent(stop_event);
         request_client_stop();
         if (ui_font != NULL) {
             DeleteObject(ui_font);
@@ -193,9 +220,26 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
     return DefWindowProcA(window, message, w_param, l_param);
 }
 
+static HWND login_field(HWND window, const char *label, const char *initial,
+                        int x, int y, int width, int maximum, DWORD flags)
+{
+    HWND text = CreateWindowExA(0, "STATIC", label, WS_CHILD | WS_VISIBLE,
+                                x, y + 4, 90, 27, window, NULL, NULL, NULL);
+    HWND input = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | flags,
+                                 x + 90, y, width, 30, window, NULL, NULL, NULL);
+    if (initial != NULL) SetWindowTextA(input, initial);
+    SendMessageW(input, EM_SETLIMITTEXT, (WPARAM)maximum, 0);
+    use_ui_font(text);
+    use_ui_font(input);
+    return input;
+}
+
 static void create_controls(HWND window)
 {
     HWND control;
+    const char *host = getenv("PROJECT13_HOST");
+    const char *port = getenv("PROJECT13_PORT");
 
     ui_font = CreateFontA(
         -18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
@@ -211,26 +255,11 @@ static void create_controls(HWND window)
     );
     use_ui_font(control);
 
-    control = CreateWindowExA(
-        0, "STATIC", "Node ID",
-        WS_CHILD | WS_VISIBLE,
-        24, 70, 100, 26,
-        window, NULL, NULL, NULL
-    );
-    use_ui_font(control);
-
-    node_edit = CreateWindowExA(
-        WS_EX_CLIENTEDGE, "EDIT", "node-ui",
-        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-        130, 66, 220, 30,
-        window, (HMENU)ID_NODE_EDIT, NULL, NULL
-    );
-    use_ui_font(node_edit);
 
     control = CreateWindowExA(
         0, "STATIC", "Run mode",
         WS_CHILD | WS_VISIBLE,
-        380, 70, 100, 26,
+        380, 158, 100, 26,
         window, NULL, NULL, NULL
     );
     use_ui_font(control);
@@ -238,7 +267,7 @@ static void create_controls(HWND window)
     mode_combo = CreateWindowExA(
         0, "COMBOBOX", "",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
-        480, 66, 230, 150,
+        480, 154, 230, 150,
         window, (HMENU)ID_MODE_COMBO, NULL, NULL
     );
     SendMessageA(mode_combo, CB_ADDSTRING, 0, (LPARAM)"Normal result");
@@ -246,11 +275,25 @@ static void create_controls(HWND window)
     SendMessageA(mode_combo, CB_ADDSTRING, 0, (LPARAM)"Tampered task test");
     SendMessageA(mode_combo, CB_SETCURSEL, 0, 0);
     use_ui_font(mode_combo);
+    if (getenv("PROJECT13_DEMO_MODE") == NULL) {
+        ShowWindow(control, SW_HIDE);
+        ShowWindow(mode_combo, SW_HIDE);
+    }
+
+    server_edit = login_field(window, "Server", host ? host : "127.0.0.1", 24, 62, 240, 253, 0);
+    port_edit = login_field(window, "Port", port ? port : "8888", 380, 62, 80, 5, ES_NUMBER);
+    username_edit = login_field(window, "Account", NULL, 24, 108, 240, 63, 0);
+    password_edit = login_field(window, "Password", NULL, 380, 108, 240, 256, ES_PASSWORD);
+
+    connection_text = CreateWindowExW(0, L"STATIC", L"Signed out",
+                                      WS_CHILD | WS_VISIBLE | SS_PATHELLIPSIS,
+                                      24, 158, 340, 26, window, NULL, NULL, NULL);
+    use_ui_font(connection_text);
 
     run_button = CreateWindowExA(
-        0, "BUTTON", "Connect and Stay Online",
+        0, "BUTTON", "Log in and Connect",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        24, 120, 200, 38,
+        24, 208, 200, 38,
         window, (HMENU)ID_RUN_BUTTON, NULL, NULL
     );
     use_ui_font(run_button);
@@ -258,7 +301,7 @@ static void create_controls(HWND window)
     disconnect_button = CreateWindowExA(
         0, "BUTTON", "Disconnect",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_DISABLED,
-        236, 120, 140, 38,
+        236, 208, 140, 38,
         window, (HMENU)ID_DISCONNECT_BUTTON, NULL, NULL
     );
     use_ui_font(disconnect_button);
@@ -266,7 +309,7 @@ static void create_controls(HWND window)
     status_text = CreateWindowExA(
         0, "STATIC", "Status: waiting",
         WS_CHILD | WS_VISIBLE,
-        392, 128, 318, 26,
+        392, 216, 318, 26,
         window, (HMENU)ID_STATUS_TEXT, NULL, NULL
     );
     use_ui_font(status_text);
@@ -274,7 +317,7 @@ static void create_controls(HWND window)
     task_text = CreateWindowExA(
         0, "STATIC", "Task: not assigned",
         WS_CHILD | WS_VISIBLE,
-        24, 178, 686, 26,
+        24, 265, 686, 26,
         window, NULL, NULL, NULL
     );
     use_ui_font(task_text);
@@ -282,7 +325,7 @@ static void create_controls(HWND window)
     progress_text = CreateWindowExA(
         0, "STATIC", "Progress: waiting for connection",
         WS_CHILD | WS_VISIBLE,
-        24, 208, 686, 26,
+        24, 295, 686, 26,
         window, NULL, NULL, NULL
     );
     use_ui_font(progress_text);
@@ -290,7 +333,7 @@ static void create_controls(HWND window)
     control = CreateWindowExA(
         0, "STATIC", "Execution log",
         WS_CHILD | WS_VISIBLE,
-        24, 246, 180, 26,
+        24, 334, 180, 26,
         window, NULL, NULL, NULL
     );
     use_ui_font(control);
@@ -299,10 +342,11 @@ static void create_controls(HWND window)
         WS_EX_CLIENTEDGE, "EDIT", "",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL |
         ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-        24, 276, 686, 246,
+        24, 364, 686, 245,
         window, (HMENU)ID_LOG_EDIT, NULL, NULL
     );
     use_ui_font(log_edit);
+    preview_attach(window, ui_font);
 }
 
 static void run_selected_mode(void)
@@ -311,7 +355,27 @@ static void run_selected_mode(void)
     int selected_mode;
     HANDLE worker;
 
-    GetWindowTextA(node_edit, worker_node, sizeof(worker_node));
+    wchar_t password[257];
+    char port_text[8], *end;
+    long port;
+    int password_size;
+
+    GetWindowTextA(server_edit, login.host, sizeof(login.host));
+    GetWindowTextA(username_edit, login.username, sizeof(login.username));
+    GetWindowTextA(port_edit, port_text, sizeof(port_text));
+    port = strtol(port_text, &end, 10);
+    GetWindowTextW(password_edit, password, _countof(password));
+    password_size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, password, -1,
+                                        login.password, sizeof(login.password), NULL, NULL);
+    clear_sensitive(password, sizeof(password));
+    SetWindowTextW(password_edit, L"");
+    if (password_size <= 1 || !login.username[0] || !login.host[0] ||
+        end == port_text || *end || port < 1 || port >= 65535) {
+        clear_sensitive(&login, sizeof(login));
+        SetWindowTextA(status_text, "Enter server, port, account and password.");
+        return;
+    }
+    login.port = (int)port;
     selected_mode = (int)SendMessageA(mode_combo, CB_GETCURSEL, 0, 0);
     if (selected_mode < 0 || selected_mode > 2) {
         selected_mode = 0;
@@ -319,9 +383,13 @@ static void run_selected_mode(void)
 
     EnableWindow(run_button, FALSE);
     EnableWindow(disconnect_button, TRUE);
-    EnableWindow(node_edit, FALSE);
     EnableWindow(mode_combo, FALSE);
-    manual_stop_requested = 0;
+    ResetEvent(stop_event);
+    reset_client_stop();
+    EnableWindow(server_edit, FALSE);
+    EnableWindow(port_edit, FALSE);
+    EnableWindow(username_edit, FALSE);
+    EnableWindow(password_edit, FALSE);
     snprintf(worker_mode, sizeof(worker_mode), "%s", modes[selected_mode]);
     SetWindowTextA(status_text, "Status: connecting and authenticating...");
     SetWindowTextA(log_edit, "");
@@ -330,10 +398,14 @@ static void run_selected_mode(void)
     /* 网络流程放到工作线程运行，避免连接和等待任务阻塞窗口消息循环。 */
     worker = CreateThread(NULL, 0, client_worker, NULL, 0, NULL);
     if (worker == NULL) {
+        clear_sensitive(&login, sizeof(login));
         SetWindowTextA(status_text, "Status: cannot start worker thread");
         EnableWindow(run_button, TRUE);
         EnableWindow(disconnect_button, FALSE);
-        EnableWindow(node_edit, TRUE);
+        EnableWindow(server_edit, TRUE);
+        EnableWindow(port_edit, TRUE);
+        EnableWindow(username_edit, TRUE);
+        EnableWindow(password_edit, TRUE);
         EnableWindow(mode_combo, TRUE);
         return;
     }
@@ -342,21 +414,23 @@ static void run_selected_mode(void)
 
 static DWORD WINAPI client_worker(LPVOID parameter)
 {
+    DWORD delay = 1000;
+    char retry_message[100];
     (void)parameter;
-    /* 断线后自动重连；用户主动断开或任务验签失败时停止重试。 */
     do {
-        worker_exit_code = run_client(
-            worker_node, worker_mode, 1, client_progress,
-            worker_log, CLIENT_LOG_SIZE
-        );
-        if (manual_stop_requested || worker_exit_code == 2) break;
-
-        client_progress(CLIENT_PROGRESS_RECONNECTING,
-                        "Connection lost; retrying in 2 seconds");
-        Sleep(2000);
-    } while (!manual_stop_requested);
-
-    if (manual_stop_requested) worker_exit_code = 0;
+        ULONGLONG started = GetTickCount64();
+        worker_exit_code = run_client(&login, worker_mode, 1, client_progress, &window_preview_hooks,
+                                      worker_log, sizeof(worker_log));
+        if (WaitForSingleObject(stop_event, 0) == WAIT_OBJECT_0 || worker_exit_code != 1) break;
+        if (GetTickCount64() - started > 30000) delay = 1000;
+        snprintf(retry_message, sizeof(retry_message),
+                 "Offline. Reconnecting in %lu seconds.", delay / 1000);
+        client_progress(CLIENT_PROGRESS_RECONNECTING, retry_message);
+        if (WaitForSingleObject(stop_event, delay) == WAIT_OBJECT_0) break;
+        if (delay < 16000) delay *= 2;
+    } while (1);
+    if (WaitForSingleObject(stop_event, 0) == WAIT_OBJECT_0) worker_exit_code = 0;
+    clear_sensitive(&login, sizeof(login));
     PostMessageA(main_window, WM_CLIENT_DONE, 0, 0);
     return 0;
 }

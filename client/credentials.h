@@ -5,7 +5,6 @@ typedef struct {
     char node_id[64];
     char license_id[64];
     char expires[16];
-    unsigned char auth_key[32];
 } NodeCredential;
 
 int load_node_credential(const char *node_id, NodeCredential *credential,
@@ -13,5 +12,6 @@ int load_node_credential(const char *node_id, NodeCredential *credential,
 int current_executable_hash(char output_hex[65],
                             char *error_text, int error_size);
 void clear_node_credential(NodeCredential *credential);
+int deployment_directory(char *directory, int capacity);
 
 #endif

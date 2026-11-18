@@ -22,6 +22,7 @@ class ProtocolError(Exception):
         self.status = status
 
 
+# 读取以换行结束的 Header，同时限制长度，拒绝超长协议头。
 def _receive_until_newline(client_socket):
     # Header 以换行符结束；逐字节读取，避免提前读走后续 Body 数据。
     data = bytearray()
@@ -36,6 +37,7 @@ def _receive_until_newline(client_socket):
     raise ProtocolError("header is too long", STATUS_TOO_LARGE)
 
 
+# 按 Header 指定的字节数循环收包，处理一条消息分多次到达的情况。
 def _receive_exact(client_socket, body_length):
     # recv 可能只返回当前已到达的一部分数据；循环读取到指定长度才算收完整帧。
     data = bytearray()
@@ -47,6 +49,7 @@ def _receive_exact(client_socket, body_length):
     return bytes(data)
 
 
+# 根据 Header 划分消息边界，并检查协议版本、正文大小和 JSON 格式。
 def receive_frame(client_socket):
     # TCP 不提供消息边界；Header 中的 Body 长度用于判断本帧结束位置，
     # 否则无法区分一帧的结尾和下一帧的开头。
@@ -81,6 +84,7 @@ def receive_frame(client_socket):
     return message_type, status, body
 
 
+# 先计算 JSON 的 UTF-8 字节数，再将 Header 与正文一起发送。
 def send_frame(client_socket, message_type, status, body):
     # 长度按 UTF-8 字节计算，而不是字符数；接收端靠它确定本帧边界。
     body_bytes = json.dumps(

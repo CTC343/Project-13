@@ -18,6 +18,22 @@
 
 typedef void (*ClientProgressCallback)(int progress_code, const char *detail);
 
+typedef struct {
+    char host[254];
+    int port;
+    char node_id[64];
+    char username[64];
+    char password[257];
+    char session_token[65];
+    char profile[260];
+    char license_id[64];
+} ClientLogin;
+
+typedef struct {
+    int (*enabled)(void);
+    void (*offer)(const ClientLogin *login, const char *view_id, const char *executable_hash);
+} ClientPreviewHooks;
+
 /*
  * 执行一次完整客户端流程。
  * mode 可使用 normal、wrong 或 tamper。
@@ -25,7 +41,10 @@ typedef void (*ClientProgressCallback)(int progress_code, const char *detail);
  * progress_callback 用于向图形界面报告连接、验证和计算状态。
  * 返回 0 表示成功，1 表示通信失败，2 表示任务认证失败。
  */
-int run_client(const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size);
+int run_client(ClientLogin *login, const char *mode, int keep_online,
+               ClientProgressCallback progress_callback, const ClientPreviewHooks *preview,
+               char *log_text, int log_size);
+void reset_client_stop(void);
 void request_client_stop(void);
 
 #endif

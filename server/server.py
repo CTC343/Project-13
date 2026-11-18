@@ -1,104 +1,129 @@
-"""项目13服务端入口：并发接收已认证节点并交给任务服务。"""
+"""Project13 listener. Control-center requests arrive over the local data directory."""
 
-import socket
-import select
 from concurrent.futures import ThreadPoolExecutor
+import json
+import re
+import select
+import socket
+import ssl
+import threading
 
-from config import (
-    HOST,
-    MAX_CONCURRENT_CLIENTS,
-    PORT,
-    REQUIRED_NODES,
-    TASK_ENABLED,
-    TASK_END,
-    TASK_OPERATION,
-    TASK_START,
-    TOTAL_ROUNDS,
-)
+from accounts import AccountStore
+from config import DATA_DIR, HOST, MAX_CONCURRENT_CLIENTS, PORT, SOCKET_TIMEOUT_SECONDS
 from credential_store import CredentialStore
+from enrollment import Enrollment
 from node_registry import NodeRegistry
-from operations import is_supported, operation_label
+from preview import PreviewBroker
+from protocol import ProtocolError, receive_frame, send_error
+from rsa_keys import read_private_key
+from security_audit import record_security_event
 from task_service import handle_client
 from task_state import TaskState
+from tls_transport import server_context
+
+COMMAND_DIR = DATA_DIR / "commands"
+AEAD_SUITES = {"TLS_AES_256_GCM_SHA384", "TLS_AES_128_GCM_SHA256"}
 
 
-def create_server():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # 允许服务重启后快速重用本地端口，避免等待操作系统回收旧连接。
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    # backlog 与线程池容量一致；超过容量的连接由操作系统排队/拒绝。
-    server_socket.listen(MAX_CONCURRENT_CLIENTS)
-    return server_socket
+def consume_commands(state):
+    for command in sorted(COMMAND_DIR.glob("*.json")):
+        try:
+            if not re.fullmatch(r"[a-f0-9]{32}", command.stem):
+                raise ValueError("invalid request ID")
+            request = json.loads(command.read_text(encoding="utf-8"))
+            if request.get("role") != "operator":
+                raise ValueError("operator role required")
+            state.start_batch(request["settings"], command.stem)
+            record_security_event("BATCH_STARTED", request["actor"], "local", command.stem)
+            print(f"Batch started: {state.get_task_id()}", flush=True)
+        except (ValueError, KeyError, TypeError) as error:
+            print(f"Batch rejected: {error}", flush=True)
+        command.unlink(missing_ok=True)
 
 
-def serve(server_socket):
-    task_state = TaskState()
-    credential_store = CredentialStore()
-    node_registry = NodeRegistry()
+def serve(server_socket, registration_socket, context, registration_context, state, credentials, accounts):
+    registry = NodeRegistry()
+    preview = PreviewBroker()
+    enrollment = Enrollment(accounts, credentials)
+    preview_capacity = threading.BoundedSemaphore(2)
+    capacity = threading.BoundedSemaphore(MAX_CONCURRENT_CLIENTS)
+    business_connections = threading.BoundedSemaphore(MAX_CONCURRENT_CLIENTS + 2)
+    registration_capacity = threading.BoundedSemaphore(8)
 
-    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_CLIENTS) as workers:
+    def run_client(client_socket, enrolling, slots):
+        try:
+            with client_socket:
+                client_socket.settimeout(SOCKET_TIMEOUT_SECONDS)
+                tls_context = registration_context if enrolling else context
+                with tls_context.wrap_socket(client_socket, server_side=True) as encrypted:
+                    if encrypted.cipher()[0] not in AEAD_SUITES:
+                        raise ssl.SSLError("unsupported cipher suite")
+                    if enrolling:
+                        enrollment.handle(encrypted)
+                    else:
+                        request = receive_frame(encrypted)
+                        is_preview = request[0] == "PREVIEW_OPEN"
+                        workers_for_type = preview_capacity if is_preview else capacity
+                        if not workers_for_type.acquire(blocking=False):
+                            send_error(encrypted, 503, "connection capacity reached")
+                            return
+                        try:
+                            if is_preview:
+                                preview.serve(encrypted, *request[1:], accounts, credentials)
+                            else:
+                                handle_client(encrypted, state, credentials, accounts, registry, request, preview)
+                        finally:
+                            workers_for_type.release()
+        except ProtocolError:
+            record_security_event("REQUEST_REJECTED", detail="invalid initial frame")
+        except (ssl.SSLError, OSError):
+            record_security_event("TLS_REJECTED", detail="handshake or transport rejected")
+        finally:
+            slots.release()
+
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_CLIENTS + 10) as workers:
         while True:
-            # 每秒检查一次监听套接字；超时后回到循环，保持可响应的监听状态。
-            readable, _, _ = select.select([server_socket], [], [], 1.0)
-            if not readable:
-                continue
-            client_socket, client_address = server_socket.accept()
-            print(
-                f"Connected: {client_address[0]}:{client_address[1]}",
-                flush=True,
-            )
-
-            def run_client(sock=client_socket, address=client_address):
-                with sock:
-                    handle_client(
-                        sock, address, task_state,
-                        credential_store, node_registry
-                    )
-
-            workers.submit(run_client)
-
-
-def validate_settings():
-    if not is_supported(TASK_OPERATION):
-        raise ValueError(f"unsupported operation {TASK_OPERATION}")
-    number_count = TASK_END - TASK_START + 1
-    if TASK_START > TASK_END or TOTAL_ROUNDS < 1:
-        raise ValueError("invalid task range or subtask count")
-    # 每轮再由客户端拆成 4 段，因此每个子任务至少需要 4 个整数。
-    if number_count < TOTAL_ROUNDS * 4:
-        raise ValueError("each subtask needs at least four values")
-    # 至少 3 个独立结果才能形成有意义的严格多数（多数门槛为 floor(n/2)+1）。
-    if REQUIRED_NODES < 3:
-        raise ValueError("at least three nodes are required")
+            consume_commands(state)
+            preview.refresh()
+            readable, _, _ = select.select([server_socket, registration_socket], [], [], 0.5)
+            for listener in readable:
+                connection, _ = listener.accept()
+                enrolling = listener is registration_socket
+                slots = registration_capacity if enrolling else business_connections
+                if slots.acquire(blocking=False):
+                    workers.submit(run_client, connection, enrolling, slots)
+                else:
+                    connection.close()
 
 
 def main():
-    validate_settings()
-    print("Starting server...", flush=True)
-    with create_server() as server_socket:
-        print(f"READY: listening on {HOST}:{PORT}", flush=True)
-        print(
-            f"Task: {operation_label(TASK_OPERATION)} "
-            f"from {TASK_START} to {TASK_END}", flush=True
-        )
-        print(f"Subtasks: split into {TOTAL_ROUNDS} ranges", flush=True)
-        print(f"Nodes per round: {REQUIRED_NODES}", flush=True)
-        print(
-            "Task mode: " + ("active" if TASK_ENABLED else "idle waiting"),
-            flush=True,
-        )
-        print("Protocol: P13/1 Header + JSON Body", flush=True)
-        print("Security: license, identity, integrity, encrypted session", flush=True)
-        print("Concurrency: select listener + thread pool enabled", flush=True)
-        serve(server_socket)
+    if not 1 <= PORT < 65535 or not 3 <= MAX_CONCURRENT_CLIENTS <= 512:
+        raise ValueError("use service port 1–65534 and capacity 3–512")
+    context = server_context()
+    registration_context = server_context(enrollment=True)
+    credentials = CredentialStore()
+    read_private_key()
+    accounts = AccountStore()
+    state = TaskState()
+    COMMAND_DIR.mkdir(exist_ok=True)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener, \
+         socket.socket(socket.AF_INET, socket.SOCK_STREAM) as registration:
+        for sock, port, backlog in ((listener, PORT, MAX_CONCURRENT_CLIENTS), (registration, PORT + 1, 8)):
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            sock.bind((HOST, port))
+            sock.listen(backlog)
+        print(f"READY: {HOST}:{PORT} mTLS, enrollment port {PORT + 1}, capacity {MAX_CONCURRENT_CLIENTS}", flush=True)
+        if not state.completed:
+            print(f"Batch active: {state.get_task_id()}", flush=True)
+        serve(listener, registration, context, registration_context, state, credentials, accounts)
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nServer stopped.")
-    except (OSError, ValueError) as error:
-        print(f"Server error: {error}", flush=True)
-        raise SystemExit(1)
+        pass
+    except (OSError, ValueError, KeyError) as error:
+        print(f"Server setup failed: {error}", flush=True)
+        raise SystemExit(1) from None

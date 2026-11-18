@@ -1,14 +1,18 @@
 """项目13服务端控制中心。只负责界面，进程操作放在 process_manager.py。"""
 
 import queue
+import os
 import re
 import sys
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
+from account_admin import AccountAdmin
+from accounts import AccountStore
 from audit import read_rounds
 from config import (
+    CLIENT_DIR,
     HOST,
     INITIAL_REPUTATION,
     MALICIOUS_WRONG_ROUNDS,
@@ -20,10 +24,12 @@ from config import (
     TOTAL_ROUNDS,
 )
 from evaluation import read_evaluation_report
-from operations import OPERATION_OPTIONS, expected_result, operation_label
+from operations import OPERATION_OPTIONS, operation_label
 from process_manager import ProcessManager
-from security_audit import read_security_events
+from runtime_log import matches, recent_logs
+from security_audit import read_security_events, record_security_event
 from security_tests import create_report, read_security_test_report
+from task_state import validate_settings
 
 
 def node_is_available(login, state, persistent):
@@ -41,7 +47,7 @@ def missing_online_nodes(required_nodes, available_nodes):
 class ControlCenter:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("项目13 服务端控制中心")
+        self.root.title(f"项目13 服务端控制中心 {os.environ.get('PROJECT13_VERSION', '1.2.0')}")
         self.root.geometry("1080x760")
         self.root.minsize(900, 620)
 
@@ -59,7 +65,14 @@ class ControlCenter:
         self.demo_buttons = []
         self.status_rows = {}
         self.available_nodes = set()
+        self.connected_nodes = set()
+        self.account_admin = None
         self.task_running = False
+        self.accounts = AccountStore()
+        self.actor = None
+        self.role = None
+        self.identity_text = tk.StringVar(value="未登录")
+        self.important = tk.BooleanVar(value=False)
 
         self._configure_style()
         self._build_page()
@@ -67,7 +80,36 @@ class ControlCenter:
         self.root.after(100, self._read_events)
 
     def run(self):
+        self.root.after_idle(self._switch_account)
         self.root.mainloop()
+
+    def _switch_account(self):
+        username = simpledialog.askstring("控制中心登录", "账号", parent=self.root)
+        if not username:
+            return
+        password = simpledialog.askstring("控制中心登录", "口令", show="*", parent=self.root)
+        if not password:
+            return
+        try:
+            role = self.accounts.verify(username, password.encode("utf-8"))
+        except (ValueError, RuntimeError):
+            record_security_event("CONSOLE_LOGIN_REJECTED", address="local")
+            messagebox.showwarning("登录未通过", "检查账号和口令，或稍后再试。")
+            return
+        if self.account_admin and (username != self.actor or role != "maintainer"):
+            self.account_admin.close()
+            self.account_admin = None
+        self.actor, self.role = username, role
+        self.identity_text.set(f"{username} · {role}")
+        record_security_event("CONSOLE_LOGIN_OK", username, "local", role)
+        self._refresh_audit()
+        self._refresh_security()
+
+    def _require_role(self, *roles):
+        if self.role in roles:
+            return True
+        messagebox.showwarning("权限不足", "用具有该操作权限的账号登录。")
+        return False
 
     def _configure_style(self):
         style = ttk.Style()
@@ -77,6 +119,19 @@ class ControlCenter:
         style.configure("TLabel", font=("Microsoft YaHei UI", 10))
         style.configure("Treeview", font=("Microsoft YaHei UI", 10), rowheight=28)
         style.configure("Treeview.Heading", font=("Microsoft YaHei UI", 10, "bold"))
+
+    def _open_account_admin(self):
+        if not self._require_role("maintainer"):
+            return
+        if self.account_admin and not self.account_admin.closed:
+            self.account_admin.window.lift()
+            return
+        actor = self.actor
+        self.account_admin = AccountAdmin(
+            self.root, self.accounts, actor,
+            lambda node_id: self.process_manager.is_server_running() and node_id in self.connected_nodes,
+            lambda: self.actor == actor and self.role == "maintainer",
+        )
 
     def _build_page(self):
         header = ttk.Frame(self.root, padding=(20, 16, 20, 10))
@@ -88,6 +143,8 @@ class ControlCenter:
         ttk.Label(header, textvariable=self.online_text).pack(
             side="right", padx=(0, 24)
         )
+        ttk.Button(header, text="登录或切换账号", command=self._switch_account).pack(side="left", padx=12)
+        ttk.Label(header, textvariable=self.identity_text).pack(side="left")
 
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True, padx=20, pady=(0, 20))
@@ -135,6 +192,8 @@ class ControlCenter:
             text="打开客户端窗口",
             command=self.process_manager.open_client_window,
         ).pack(side="left")
+        ttk.Button(button_frame, text="账号管理", command=self._open_account_admin).pack(side="left", padx=(10, 0))
+        ttk.Checkbutton(button_frame, text="重要任务", variable=self.important).pack(side="left", padx=16)
 
         ttk.Label(
             parent,
@@ -222,7 +281,7 @@ class ControlCenter:
             "subtask_count": TOTAL_ROUNDS,
             "nodes_per_subtask": REQUIRED_NODES,
         }
-        settings = {"operation": operation}
+        settings = {"operation": operation, "important": self.important.get()}
 
         try:
             for field_name, default_value in defaults.items():
@@ -232,32 +291,17 @@ class ControlCenter:
             messagebox.showerror("输入错误", "所有输入项必须是整数。")
             return None
 
-        number_count = settings["end"] - settings["start"] + 1
-        if number_count < 1:
-            messagebox.showerror("输入错误", "最终值必须大于或等于起始值。")
-            return None
-        if number_count > 2000000:
-            messagebox.showerror("输入错误", "演示范围暂时不能超过 200 万个数。")
-            return None
-        if number_count < settings["subtask_count"] * 4:
-            messagebox.showerror(
-                "输入错误", "为了生成四步 Merkle 证明，每个子任务至少需要 4 个数。"
-            )
-            return None
-        if not 3 <= settings["nodes_per_subtask"] <= 50:
-            messagebox.showerror("输入错误", "每个子任务的节点数必须在 3 到 50 之间。")
-            return None
-
-        final_value = expected_result(
-            operation, settings["start"], settings["end"]
-        )
-        if not -2147483648 <= final_value <= 2147483647:
-            messagebox.showerror("输入错误", "结果超出当前 C 客户端整数范围。")
+        try:
+            validate_settings(settings)
+        except ValueError as error:
+            messagebox.showerror("输入错误", str(error))
             return None
 
         return settings
 
     def _run_operation(self, operation):
+        if not self._require_role("operator"):
+            return
         settings = self._read_operation_settings(operation)
         if settings is None:
             return
@@ -283,12 +327,15 @@ class ControlCenter:
             )
             return
 
+        try:
+            self.process_manager.submit_batch(settings, self.actor, self.role)
+        except (OSError, RuntimeError) as error:
+            messagebox.showerror("提交任务失败", str(error))
+            return
         self._clear_results()
         self.task_running = True
         for button in self.demo_buttons:
             button.configure(state="disabled")
-        self._clear_node_status()
-        self.process_manager.restart_server(settings)
 
     def _build_result_tab(self, parent):
         ttk.Label(parent, textvariable=self.majority_text,
@@ -320,6 +367,19 @@ class ControlCenter:
         self.result_table.pack(fill="both", expand=True)
 
     def _build_log_tab(self, parent):
+        actions = ttk.Frame(parent)
+        actions.pack(fill="x", pady=(0, 8))
+        self.log_level = tk.StringVar(value="全部级别")
+        self.log_search = tk.StringVar()
+        self.log_filter = ("", "")
+        levels = ttk.Combobox(actions, textvariable=self.log_level, width=11, state="readonly",
+                              values=("全部级别", "信息", "警告", "错误"))
+        levels.pack(side="left")
+        levels.bind("<<ComboboxSelected>>", lambda event: self._load_runtime_log())
+        query = ttk.Entry(actions, textvariable=self.log_search, width=36)
+        query.pack(side="left", padx=(8, 6))
+        query.bind("<Return>", lambda event: self._load_runtime_log())
+        ttk.Button(actions, text="搜索历史日志", command=self._load_runtime_log).pack(side="left")
         self.log_box = tk.Text(
             parent,
             wrap="word",
@@ -330,6 +390,20 @@ class ControlCenter:
         self.log_box.configure(yscrollcommand=scrollbar.set)
         self.log_box.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        self._load_runtime_log()
+
+    def _load_runtime_log(self):
+        levels = {"信息": "INFO", "警告": "WARNING", "错误": "ERROR"}
+        self.log_filter = levels.get(self.log_level.get(), ""), self.log_search.get().strip()
+        try:
+            entries = recent_logs(*self.log_filter)
+        except OSError:
+            entries = ["暂时无法读取历史日志"]
+        self.log_box.configure(state="normal")
+        self.log_box.delete("1.0", "end")
+        self.log_box.configure(state="disabled")
+        if entries:
+            self._append_log("\n".join(entries) + "\n")
 
     def _build_node_tab(self, parent):
         ttk.Label(
@@ -490,10 +564,10 @@ class ControlCenter:
             ("任务签名", "已完成", "唯一水印、服务端私钥签名和客户端验签"),
             ("Merkle Tree", "已完成", "四段计算步骤和根哈希验证"),
             ("信誉调度", "已完成", "低信誉节点不再接收重要任务"),
-            ("并发与重连", "已完成", "线程池并发处理，客户端三次有限重连"),
-            ("登录与心跳", "已完成", "节点凭据认证、在线状态和心跳记录"),
+            ("并发与重连", "已接入", "断线后保持可用，连接恢复后自动补传结果"),
+            ("登录与心跳", "已接入", "口令慢哈希、账号角色、节点证书和心跳"),
             ("私有协议", "已完成", "P13/1 Header + JSON Body + 状态码"),
-            ("安全会话", "已完成", "加密、消息认证、序号和随机数抗重放"),
+            ("安全会话", "已接入", "TLS 1.3、双向证书和 AES-GCM"),
             ("软件保护", "已完成", "许可证绑定和程序哈希完整性白名单"),
             ("安全测试", "已完成", "重放、篡改、伪造身份和非法输入自检"),
             ("TEE 报告", "无", "不进行模拟"),
@@ -517,11 +591,17 @@ class ControlCenter:
             table.insert("", "end", values=(module_name, status, description))
 
     def _start_server(self):
+        if not self._require_role("maintainer"):
+            return
+        record_security_event("CONSOLE_START_SERVICE", self.actor, "local")
         if self.process_manager.start_server():
             self._clear_results()
             self._clear_node_status()
 
     def _stop_server(self):
+        if not self._require_role("maintainer"):
+            return
+        record_security_event("CONSOLE_STOP_SERVICE", self.actor, "local")
         self.process_manager.stop_server()
         self.task_running = False
         for button in self.demo_buttons:
@@ -530,6 +610,7 @@ class ControlCenter:
 
     def _clear_node_status(self):
         self.available_nodes.clear()
+        self.connected_nodes.clear()
         self.online_text.set("手动在线节点：0")
         for row_id in self.node_status_table.get_children():
             self.node_status_table.delete(row_id)
@@ -560,12 +641,17 @@ class ControlCenter:
         if event_type == "status":
             self.status_text.set(event[1])
         elif event_type == "server_line":
-            self._append_log(f"[server] {event[1]}\n")
             self._read_server_line(event[1])
+        elif event_type == "runtime_log":
+            if matches(event[1], *self.log_filter):
+                self._append_log(event[1] + "\n")
         elif event_type == "client_log":
             node_id = event[1]
             output = event[2]
             self._append_log(f"[{node_id}]\n{output}\n")
+        elif event_type == "server_recovering":
+            self._clear_node_status()
+            self.status_text.set(event[1])
         elif event_type == "server_stopped":
             if not self.process_manager.is_server_running():
                 self.status_text.set(event[1])
@@ -606,7 +692,19 @@ class ControlCenter:
             integrated_value = line.split(":", 1)[1].strip()
             self.integrated_text.set(f"当前累计整合结果：{integrated_value}")
         elif line.startswith("Vote failed:"):
-            self.majority_text.set("多数表决失败：没有两个一致结果")
+            self.majority_text.set("多数表决失败：没有过半数的一致结果")
+            self.task_running = False
+            for button in self.demo_buttons:
+                button.configure(state="normal")
+        elif line.startswith("Batch rejected:"):
+            self.status_text.set(line)
+            self.task_running = False
+            for button in self.demo_buttons:
+                button.configure(state="normal")
+        elif line.startswith(("Batch started:", "Batch active:")):
+            self.task_running = True
+            for button in self.demo_buttons:
+                button.configure(state="disabled")
         elif line.startswith("Malicious node detected:"):
             node_id = line.split(":", 1)[1].strip()
             self._set_node_value(node_id, status="持续异常")
@@ -666,6 +764,10 @@ class ControlCenter:
             "waiting": "在线等待任务",
         }
         is_persistent = persistent == "1"
+        if login == "authenticated" and state != "offline":
+            self.connected_nodes.add(node_id)
+        else:
+            self.connected_nodes.discard(node_id)
         is_available = node_is_available(login, state, persistent)
         if is_available:
             self.available_nodes.add(node_id)
@@ -690,6 +792,9 @@ class ControlCenter:
     def _append_log(self, text):
         self.log_box.configure(state="normal")
         self.log_box.insert("end", text)
+        lines = int(self.log_box.index("end-1c").split(".")[0])
+        if lines > 500:
+            self.log_box.delete("1.0", f"{lines - 499}.0")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
 
@@ -743,9 +848,9 @@ class ControlCenter:
             ),
             (
                 "安全机制时间开销",
-                f"{report['security_overhead_percent']:.2f}%",
+                "待同版本端到端实测",
                 "不超过 30%",
-                "通过" if report["security_overhead_passed"] else "未通过",
+                "未实测",
             ),
             (
                 "恶意节点比例与识别",
@@ -758,6 +863,8 @@ class ControlCenter:
             self.evaluation_table.insert("", "end", values=row)
 
     def _run_security_tests(self):
+        if not self._require_role("maintainer", "auditor"):
+            return
         report = create_report()
         self._refresh_security()
         result_text = f"{report['passed']}/{report['total']} 项通过"
@@ -769,7 +876,7 @@ class ControlCenter:
     def _refresh_security(self):
         for row_id in self.security_test_table.get_children():
             self.security_test_table.delete(row_id)
-        report = read_security_test_report()
+        report = read_security_test_report() if self.role in ("maintainer", "auditor") else {}
         if not report:
             self.security_test_table.insert(
                 "", "end", values=("尚未运行", "-", "点击右上角按钮")
@@ -786,6 +893,8 @@ class ControlCenter:
 
         for row_id in self.security_event_table.get_children():
             self.security_event_table.delete(row_id)
+        if self.role not in ("maintainer", "auditor"):
+            return
         for item in read_security_events()[-100:]:
             self.security_event_table.insert(
                 "", "end", values=(
@@ -795,6 +904,8 @@ class ControlCenter:
             )
 
     def _close_window(self):
+        if self.account_admin:
+            self.account_admin.close()
         self.process_manager.stop_server()
         self.root.destroy()
 
@@ -803,8 +914,8 @@ def check_files():
     project_root = Path(__file__).resolve().parent.parent
     required_files = [
         project_root / "server" / "server.py",
-        project_root / "client" / "client.exe",
-        project_root / "client" / "client_gui.exe",
+        CLIENT_DIR / "client.exe",
+        CLIENT_DIR / "client_gui.exe",
     ]
 
     missing_files = [str(path) for path in required_files if not path.exists()]

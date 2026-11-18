@@ -1,6 +1,7 @@
 """服务端和控制页面共同使用的简单配置。"""
 
 import os
+from pathlib import Path
 
 
 def read_int(name, default_value):
@@ -9,19 +10,23 @@ def read_int(name, default_value):
     except ValueError:
         return default_value
 
-HOST = "127.0.0.1"
-PORT = 8888
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.environ.get("PROJECT13_DATA_DIR", PROJECT_ROOT / "data" / "runtime")).resolve()
+CLIENT_DIR = Path(os.environ.get("PROJECT13_CLIENT_DIR", PROJECT_ROOT / "client" / "output")).resolve()
+TLS_DIR = DATA_DIR / "tls"
+HOST = os.environ.get("PROJECT13_HOST", "127.0.0.1")
+PORT = read_int("PROJECT13_PORT", 8888)
 PROTOCOL_VERSION = "P13/1"
 MAX_HEADER = 128
-MAX_BODY = 8192
+MAX_BODY = 8191
 SOCKET_TIMEOUT_SECONDS = 8
 AUTH_TIME_WINDOW_SECONDS = 60
 SESSION_TIMEOUT_SECONDS = 30
-MAX_CONCURRENT_CLIENTS = 64
+MAX_CONCURRENT_CLIENTS = read_int("PROJECT13_MAX_CLIENTS", 64)
 
 TASK_ID_PREFIX = "task"
 TASK_OPERATION = os.environ.get("PROJECT13_OPERATION", "SUM_RANGE")
-TASK_ENABLED = os.environ.get("PROJECT13_TASK_ENABLED", "1") == "1"
+TASK_ENABLED = os.environ.get("PROJECT13_TASK_ENABLED", "0") == "1"
 TASK_START = read_int("PROJECT13_TASK_START", 1)
 TASK_END = read_int("PROJECT13_TASK_END", 1000)
 REQUIRED_NODES = read_int("PROJECT13_REQUIRED_NODES", 10)

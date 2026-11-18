@@ -58,6 +58,7 @@ static int exponent_bytes(unsigned long exponent, unsigned char output[8])
     return count;
 }
 
+/* 使用服务端公钥验证任务的 RSA/SHA-256/PKCS#1 v1.5 签名。 */
 int verify_task_signature(const char *task_text, const char *signature_hex)
 {
     BCRYPT_ALG_HANDLE algorithm = NULL;

@@ -17,6 +17,7 @@ static void write_u64_big_endian(unsigned char output[8], uint64_t value)
     }
 }
 
+/* 用 HMAC 和计数器生成加解密所需的密钥流。 */
 static int make_keystream(const unsigned char key[32], const char *direction,
                           const char *session_id, long sequence,
                           const unsigned char nonce[16],
@@ -59,6 +60,7 @@ static int make_keystream(const unsigned char key[32], const char *direction,
     return 1;
 }
 
+/* 由长期认证密钥和本次握手参数派生会话密钥。 */
 int derive_session_key(const unsigned char auth_key[32],
                        const char *client_nonce, const char *server_nonce,
                        const char *session_id, unsigned char output[32])
@@ -71,6 +73,7 @@ int derive_session_key(const unsigned char auth_key[32],
                        (int)strlen(material), output);
 }
 
+/* 正文与密钥流异或，完成加密或解密。 */
 static int crypt_message(const unsigned char key[32], const char *direction,
                          const char *session_id, long sequence,
                          const unsigned char nonce[16],
@@ -92,6 +95,7 @@ static int crypt_message(const unsigned char key[32], const char *direction,
     return 1;
 }
 
+/* 客户端发送前，加密正文并生成认证标签和安全信封。 */
 int protect_client_message(SecureSession *session, const char *plain_json,
                            char *envelope, int envelope_size)
 {
@@ -137,6 +141,7 @@ int protect_client_message(SecureSession *session, const char *plain_json,
     return needed > 0 && needed < envelope_size;
 }
 
+/* 客户端接收后，检查会话、序号和标签，再解密正文。 */
 int open_server_message(SecureSession *session, const char *envelope,
                         char *plain_json, int plain_size)
 {
@@ -187,6 +192,7 @@ cleanup:
     return success;
 }
 
+/* 会话结束时清除内存中的密钥和状态。 */
 void clear_secure_session(SecureSession *session)
 {
     clear_sensitive(session, sizeof(*session));

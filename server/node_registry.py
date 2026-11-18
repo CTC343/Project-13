@@ -8,7 +8,20 @@ class NodeRegistry:
     def __init__(self):
         self._lock = threading.Lock()
         self._nodes = {}
+        self._active = set()
 
+    def claim(self, node_id):
+        with self._lock:
+            if node_id in self._active:
+                return False
+            self._active.add(node_id)
+            return True
+
+    def release(self, node_id):
+        with self._lock:
+            self._active.discard(node_id)
+
+    # 加锁更新节点的登录、心跳和任务状态，并输出供界面读取的状态日志。
     def update(self, node_id, address, login_status, state, persistent=None):
         now = datetime.now().isoformat(timespec="seconds")
         with self._lock:

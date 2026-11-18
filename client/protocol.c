@@ -8,7 +8,7 @@
 
 #define HEADER_SIZE 128
 
-int protocol_send_frame(SOCKET server_socket, const char *message_type,
+int protocol_send_frame(NetworkConnection *connection, const char *message_type,
                         int status, const char *json_body,
                         char *error_text, int error_size)
 {
@@ -26,39 +26,40 @@ int protocol_send_frame(SOCKET server_socket, const char *message_type,
     snprintf(header, sizeof(header), "P13/1 %s %d %d\n",
              message_type, status, body_length);
     /* Header 与 Body 分开发送；TCP 可能分段，接收端会按协议边界读取。 */
-    if (!network_send_bytes(server_socket, header, (int)strlen(header),
+    if (!network_send_bytes(connection, header, (int)strlen(header),
                             error_text, error_size)) return 0;
-    return network_send_bytes(server_socket, json_body, body_length,
+    return network_send_bytes(connection, json_body, body_length,
                               error_text, error_size);
 }
 
-int protocol_receive_frame(SOCKET server_socket, char *message_type,
+int protocol_receive_frame(NetworkConnection *connection, char *message_type,
                            int type_size, int *status,
                            char *json_body, int body_size,
                            char *error_text, int error_size)
 {
     char header[HEADER_SIZE];
-    char version[16];
+    char version[16], parsed_type[32];
     int body_length;
     /* 先读到 Header 的换行符，再解析消息类型、状态码和 Body 长度。 */
-    if (!network_receive_line(server_socket, header, sizeof(header),
+    if (!network_receive_line(connection, header, sizeof(header),
                               error_text, error_size)) return 0;
-    if (sscanf(header, "%15s %31s %d %d", version, message_type,
+    if (sscanf(header, "%15s %31s %d %d", version, parsed_type,
                status, &body_length) != 4 || strcmp(version, "P13/1") != 0) {
         snprintf(error_text, error_size, "Invalid protocol header.");
         return 0;
     }
     /* 确认输出缓冲区能容纳 Body 及结尾的 '\0'，并拒绝无效长度。 */
-    if ((int)strlen(message_type) >= type_size ||
+    if ((int)strlen(parsed_type) >= type_size ||
         body_length < 2 || body_length >= body_size) {
         snprintf(error_text, error_size, "Protocol body is too large.");
         return 0;
     }
+    memcpy(message_type, parsed_type, strlen(parsed_type) + 1);
     /*
      * 按 Header 声明的长度读齐 Body，再补 C 字符串结束符。
      * 接收可能分多次才凑够这些字节，不能假设一次 recv 就能读完整。
      */
-    if (!network_receive_exact(server_socket, json_body, body_length,
+    if (!network_receive_exact(connection, json_body, body_length,
                                error_text, error_size)) return 0;
     json_body[body_length] = '\0';
     /* 客户端这里做基本对象边界检查；完整 JSON 解析由业务取值函数处理。 */

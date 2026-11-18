@@ -9,6 +9,7 @@
 
 #define SHA256_SIZE 32
 
+/* 计算字符串的 SHA-256 摘要。 */
 int sha256_hex(const char *message, char output_hex[65])
 {
     BCRYPT_ALG_HANDLE algorithm = NULL;
@@ -81,6 +82,7 @@ cleanup:
     return success;
 }
 
+/* 计算程序文件的 SHA-256 摘要，供白名单校验。 */
 int sha256_file_hex(const char *path, char output_hex[65])
 {
     BCRYPT_ALG_HANDLE algorithm = NULL;
@@ -139,6 +141,7 @@ cleanup:
     return success;
 }
 
+/* 使用共享密钥计算 HMAC-SHA-256 认证标签。 */
 int hmac_sha256(const unsigned char *key, int key_size,
                 const unsigned char *data, int data_size,
                 unsigned char output[32])
@@ -185,6 +188,7 @@ cleanup:
     return success;
 }
 
+/* 将 HMAC 标签输出为十六进制文本。 */
 int hmac_sha256_hex(const unsigned char *key, int key_size,
                     const char *text, char output_hex[65])
 {
@@ -197,6 +201,7 @@ int hmac_sha256_hex(const unsigned char *key, int key_size,
     return success;
 }
 
+/* 生成登录和安全消息使用的随机数。 */
 int secure_random(unsigned char *output, int output_size)
 {
     /* 使用系统首选随机数生成器，供 nonce 和认证挑战使用。 */

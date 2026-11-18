@@ -3,6 +3,7 @@
 from config import IMPORTANT_TASK_MIN_REPUTATION
 
 
+# 筛选信誉达标且未被标记为恶意的节点，形成重要任务候选名单。
 def choose_important_task_nodes(reputation_scores, malicious_nodes):
     eligible_nodes = []
 

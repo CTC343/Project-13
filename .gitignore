@@ -9,6 +9,9 @@ __pycache__/
 *.o
 *.obj
 client/output/
+data/runtime/
+work/project13-verification/
+releases/
 
 # ===== 运行时机密 =====
 client/credentials/

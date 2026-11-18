@@ -5,10 +5,12 @@ import hashlib
 from operations import merge_values
 
 
+# 计算 Merkle 节点使用的 SHA-256 摘要。
 def hash_text(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+# 将四段结果逐层哈希，重新计算 Merkle 根。
 def build_merkle_root(step_values):
     # 客户端固定提交 4 段；两两合并恰好形成两层父节点和一个根。
     leaf_hashes = [hash_text(str(value)) for value in step_values]
@@ -17,6 +19,7 @@ def build_merkle_root(step_values):
     return hash_text(left_hash + right_hash)
 
 
+# 检查分段结果、总结果和 Merkle 根是否相互一致。
 def verify_result_proof(operation, result_value, proof_text, expected_root):
     try:
         step_values = [int(value) for value in proof_text.split(",")]

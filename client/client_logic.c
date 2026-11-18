@@ -9,25 +9,29 @@
 
 #include "client_logic.h"
 #include "credentials.h"
+#include "device.h"
 #include "merkle.h"
 #include "network.h"
 #include "operations.h"
 #include "protocol.h"
-#include "secure_channel.h"
+#include "outbox.h"
 #include "security.h"
 #include "signature.h"
 
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 8888
 #define TEXT_SIZE 8192
 
-static volatile int stop_requested = 0;
+static volatile LONG stop_requested = 0;
 
 static void add_log(char *log_text, int log_size, const char *format, ...);
 
+void reset_client_stop(void)
+{
+    InterlockedExchange(&stop_requested, 0);
+}
+
 void request_client_stop(void)
 {
-    stop_requested = 1;
+    InterlockedExchange(&stop_requested, 1);
 }
 
 static void report_progress(ClientProgressCallback callback, int progress_code,
@@ -47,18 +51,16 @@ static int valid_node_id(const char *node_id)
     return 1;
 }
 
-static int receive_secure_any(SOCKET socket_value, SecureSession *session,
+static int receive_secure_any(NetworkConnection *connection,
                               char *plain, char *action, int action_size,
                               char *error_text, int error_size)
 {
     char type[32];
-    char envelope[PROTOCOL_BODY_SIZE];
     int status;
-    if (!protocol_receive_frame(socket_value, type, sizeof(type), &status,
-                                envelope, sizeof(envelope),
+    if (!protocol_receive_frame(connection, type, sizeof(type), &status,
+                                plain, TEXT_SIZE,
                                 error_text, error_size)) return 0;
     if (strcmp(type, "SECURE") != 0 ||
-        !open_server_message(session, envelope, plain, TEXT_SIZE) ||
         !json_get_string(plain, "action", action, action_size)) {
         snprintf(error_text, error_size,
                  "Secure response authentication failed.");
@@ -73,10 +75,10 @@ static int receive_secure_any(SOCKET socket_value, SecureSession *session,
     return 1;
 }
 
-static int receive_secure(SOCKET socket_value, SecureSession *session,  const char *expected_action, char *plain,  char *error_text, int error_size)
+static int receive_secure(NetworkConnection *connection,  const char *expected_action, char *plain,  char *error_text, int error_size)
 {
     char action[64];
-    if (!receive_secure_any(socket_value, session, plain, action,
+    if (!receive_secure_any(connection, plain, action,
                             sizeof(action), error_text, error_size)) return 0;
     if (strcmp(action, expected_action) != 0) {
         snprintf(error_text, error_size, "Expected %s, received %s.",
@@ -87,64 +89,53 @@ static int receive_secure(SOCKET socket_value, SecureSession *session,  const ch
 }
 
 
-//把业务 JSON 加密并附加认证标签，封装成类型 SECURE、状态 0 的协议帧发送；成功返回非零，失败返回 0。
-static int send_secure(SOCKET socket_value, SecureSession *session,
+static int send_secure(NetworkConnection *connection,
                        const char *plain, char *error_text, int error_size)
 {
-    char envelope[PROTOCOL_BODY_SIZE];
-    if (!protect_client_message(session, plain, envelope, sizeof(envelope))) {
-        snprintf(error_text, error_size, "Cannot protect secure message.");
-        return 0;
-    }
-    return protocol_send_frame(socket_value, "SECURE", 0, envelope, error_text, error_size);
+    return protocol_send_frame(connection, "SECURE", 0, plain, error_text, error_size);
 }
 
-
-
-static int send_heartbeat(SOCKET socket_value, SecureSession *session,
-                          char *server_body,
+static int send_heartbeat(NetworkConnection *connection,
+                          const ClientLogin *login, const char *executable_hash,
+                          const ClientPreviewHooks *preview, char *server_body,
                           char *error_text, int error_size)
 {
     char body[128];
+    int enabled = preview && preview->enabled();
     snprintf(body, sizeof(body),
-             "{\"action\":\"HEARTBEAT\",\"sent_at\":%ld}",
-             (long)time(NULL));
-    return send_secure(socket_value, session, body, error_text, error_size) &&
-           receive_secure(socket_value, session, "HEARTBEAT_ACK", server_body,
-                          error_text, error_size);
+             "{\"action\":\"HEARTBEAT\",\"sent_at\":%ld,\"preview_enabled\":%d}",
+             (long)time(NULL), enabled);
+    if (!send_secure(connection, body, error_text, error_size) ||
+        !receive_secure(connection, "HEARTBEAT_ACK", server_body, error_text, error_size)) return 0;
+    if (preview) {
+        char view_id[33] = "";
+        if (enabled) json_get_string(server_body, "preview_id", view_id, sizeof(view_id));
+        preview->offer(login, view_id, executable_hash);
+    }
+    return 1;
 }
 
-static int send_logout(SOCKET socket_value, SecureSession *session,
+static int send_logout(NetworkConnection *connection,
                        char *error_text, int error_size)
 {
     const char *body = "{\"action\":\"LOGOUT\"}";
-    return send_secure(socket_value, session, body, error_text, error_size);
+    return send_secure(connection, body, error_text, error_size);
 }
 
 
 
-int run_client(const char *node_id, const char *mode, int keep_online,
-               ClientProgressCallback progress_callback,
+int run_client(ClientLogin *login, const char *mode, int keep_online,
+               ClientProgressCallback progress_callback, const ClientPreviewHooks *preview,
                char *log_text, int log_size)
 {
     int simulate_wrong_result = mode != NULL && strcmp(mode, "wrong") == 0;
     int simulate_tampered_task = mode != NULL && strcmp(mode, "tamper") == 0;
     int waiting_logged = 0;
     int completed_task = 0;
-    NodeCredential credential;
-    SecureSession session;
-    unsigned char nonce_bytes[16];
-    char client_nonce[33];
     char executable_hash[65];
-    char auth_text[512];
-    char auth_tag[65];
     char body[TEXT_SIZE];
     char server_body[TEXT_SIZE];
     char message_type[32];
-    char server_nonce[33];
-    char server_proof[65];
-    char expected_proof[65];
-    char proof_text[256];
     char action[64];
     char task_id[64];
     char operation[32];
@@ -156,31 +147,27 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     long range_start;
     long range_end;
     long result;
-    long timestamp;
     long retry_after;
     int status;
     int return_code = 1;
-    SOCKET server_socket = INVALID_SOCKET;
+    NetworkConnection connection = {INVALID_SOCKET};
+    const char *node_id = login->node_id;
+    char password_hex[513] = {0};
+    Outbox outbox = {0};
+    int connection_status;
+    int pending_status;
+    int authenticated = 0;
 
-    stop_requested = 0;
-    memset(&credential, 0, sizeof(credential));
-    memset(&session, 0, sizeof(session));
     if (log_text == NULL || log_size <= 0) return 1;
     log_text[0] = '\0';
 
     /* 准备阶段：检查节点 ID，读取授权信息，并计算客户端程序哈希。 */
-    if (!valid_node_id(node_id)) {
+    if (!valid_node_id(login->username) || login->host[0] == 0 || login->port < 1 || login->port >= 65535) {
+        return_code = 2;
         add_log(log_text, log_size,
-                "Node ID may contain only letters, numbers, '-' and '_'.\r\n");
+                "Invalid login fields. Account IDs use letters, digits, dash or underscore.\r\n");
         goto cleanup;
     }
-    if (!load_node_credential(node_id, &credential,
-                              network_error, sizeof(network_error))) {
-        add_log(log_text, log_size, "License: failed - %s\r\n", network_error);
-        goto cleanup;
-    }
-    add_log(log_text, log_size, "License: loaded for %s, expires %s\r\n",
-            credential.node_id, credential.expires);
     if (!current_executable_hash(executable_hash,
                                  network_error, sizeof(network_error))) {
         add_log(log_text, log_size, "%s\r\n", network_error);
@@ -188,84 +175,85 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     }
     add_log(log_text, log_size, "Executable integrity: hash ready\r\n");
 
-    /* 连接阶段：启动网络并连接服务器，最多尝试 3 次。 */
-    if (!network_start(network_error, sizeof(network_error))) {
+    report_progress(progress_callback, CLIENT_PROGRESS_CONNECTING, "Signing in over TLS");
+    connection_status = device_prepare(login, executable_hash, network_error, sizeof(network_error));
+    if (connection_status != 1 || !valid_node_id(node_id) || !valid_node_id(login->license_id)) {
+        add_log(log_text, log_size, "Device setup: %s\r\n", network_error);
+        if (connection_status != 0) return_code = 2;
+        goto cleanup;
+    }
+    connection_status = network_connect(&connection, login->host, login->port, login->profile,
+                                        network_error, sizeof(network_error));
+    if (connection_status != 1) {
         add_log(log_text, log_size, "%s\r\n", network_error);
+        if (connection_status < 0) return_code = 2;
         goto cleanup;
     }
-    report_progress(progress_callback, CLIENT_PROGRESS_CONNECTING,
-                    "Connecting and authenticating");
-    add_log(log_text, log_size, "Connection: trying server (up to 3 attempts)\r\n");
-    server_socket = network_connect_retry(
-        SERVER_IP, SERVER_PORT, 3, network_error, sizeof(network_error)
-    );
-    if (server_socket == INVALID_SOCKET) {
-        add_log(log_text, log_size, "%s\r\n", network_error);
-        goto cleanup;
-    }
-    add_log(log_text, log_size, "Connection: connected\r\n");
-
-    /* 认证阶段：发送节点授权、程序哈希和身份签名，验证服务器身份并建立加密会话。 */
-    if (!secure_random(nonce_bytes, sizeof(nonce_bytes))) {
-        add_log(log_text, log_size, "Secure random generation failed.\r\n");
-        goto cleanup;
-    }
-    bytes_to_hex(nonce_bytes, sizeof(nonce_bytes), client_nonce);
-    timestamp = (long)time(NULL);
-    snprintf(auth_text, sizeof(auth_text), "%s|%s|%ld|%s|%s|%d",
-             node_id, credential.license_id, timestamp,
-             client_nonce, executable_hash, keep_online ? 1 : 0);
-    if (!hmac_sha256_hex(credential.auth_key, 32, auth_text, auth_tag)) {
-        add_log(log_text, log_size, "Identity proof generation failed.\r\n");
-        goto cleanup;
-    }
+    bytes_to_hex((const unsigned char *)login->password, (int)strlen(login->password), password_hex);
     snprintf(body, sizeof(body),
-        "{\"node_id\":\"%s\",\"license_id\":\"%s\","
-        "\"timestamp\":%ld,\"client_nonce\":\"%s\","
-        "\"exe_hash\":\"%s\",\"auth_tag\":\"%s\","
-        "\"persistent\":%d}",
-        node_id, credential.license_id, timestamp, client_nonce,
-        executable_hash, auth_tag, keep_online ? 1 : 0);
-    if (!protocol_send_frame(server_socket, "AUTH", 0, body,
-                             network_error, sizeof(network_error)) ||
-        !protocol_receive_frame(server_socket, message_type,
-                                sizeof(message_type), &status,
-                                server_body, sizeof(server_body),
-                                network_error, sizeof(network_error))) {
+        "{\"node_id\":\"%s\",\"license_id\":\"%s\",\"exe_hash\":\"%s\","
+        "\"username\":\"%s\",\"password_hex\":\"%s\",\"token\":\"%s\",\"persistent\":%d}",
+        node_id, login->license_id, executable_hash, login->username,
+        password_hex, login->session_token, keep_online ? 1 : 0);
+    if (!protocol_send_frame(&connection, "AUTH", 0, body, network_error, sizeof(network_error))) {
         add_log(log_text, log_size, "Login: %s\r\n", network_error);
         goto cleanup;
     }
-    
-    if (strcmp(message_type, "AUTH_OK") != 0 || status != 200 ||
-        !json_get_string(server_body, "session_id", session.session_id,
-                         sizeof(session.session_id)) ||
-        !json_get_string(server_body, "server_nonce", server_nonce,
-                         sizeof(server_nonce)) ||
-        !json_get_string(server_body, "server_proof", server_proof,
-                         sizeof(server_proof))) {
-        char detail[256] = "authentication rejected";
-        json_get_string(server_body, "detail", detail, sizeof(detail));
-        add_log(log_text, log_size, "Login: rejected - %s\r\n", detail);
+    clear_sensitive(body, sizeof(body));
+    clear_sensitive(password_hex, sizeof(password_hex));
+    if (!protocol_receive_frame(&connection, message_type, sizeof(message_type), &status,
+                                server_body, sizeof(server_body), network_error, sizeof(network_error))) {
+        add_log(log_text, log_size, "TLS login did not receive a reply. Check the node certificate.\r\n");
+        return_code = 1;
         goto cleanup;
     }
-    snprintf(proof_text, sizeof(proof_text), "SERVER|%s|%s|%s",
-             session.session_id, client_nonce, server_nonce);
-    if (!hmac_sha256_hex(credential.auth_key, 32, proof_text, expected_proof) ||
-        !constant_time_equal(server_proof, expected_proof) ||
-        !derive_session_key(credential.auth_key, client_nonce, server_nonce,
-                            session.session_id, session.key)) {
-        add_log(log_text, log_size, "Server identity verification failed.\r\n");
+    if (strcmp(message_type, "AUTH_OK") != 0 || status != 200 ||
+        !json_get_string(server_body, "token", login->session_token, sizeof(login->session_token))) {
+        char detail[160] = "authentication rejected";
+        json_get_string(server_body, "detail", detail, sizeof(detail));
+        add_log(log_text, log_size, "Login: %s\r\n", detail);
+        return_code = status == 409 || status == 503 ? 1 : 2;
+        goto cleanup;
+    }
+    clear_sensitive(server_body, sizeof(server_body));
+    clear_sensitive(login->password, sizeof(login->password));
+    authenticated = 1;
+    snprintf(progress_text, sizeof(progress_text), "%s:%d · %s", login->host, login->port, node_id);
+    add_log(log_text, log_size, "Login accepted by %s over TLS 1.3.\r\n", progress_text);
+    report_progress(progress_callback, CLIENT_PROGRESS_AUTHENTICATED, progress_text);
+
+    if (!outbox_init(login, &outbox)) {
+        add_log(log_text, log_size, "Cannot open the local result outbox.\r\n");
         return_code = 2;
         goto cleanup;
     }
-    add_log(log_text, log_size,
-            "Login: authenticated; license and executable accepted\r\n");
-    add_log(log_text, log_size, "Encrypted session: established\r\n");
-    report_progress(progress_callback, CLIENT_PROGRESS_AUTHENTICATED,
-                    "Authentication passed");
+    pending_status = outbox_load(&outbox, body, sizeof(body));
+    if (pending_status < 0) {
+        add_log(log_text, log_size, "Pending result requires local recovery.\r\n");
+        return_code = 2;
+        goto cleanup;
+    }
+    if (pending_status > 0) {
+        if (!json_get_string(body, "task_id", task_id, sizeof(task_id)) ||
+            !send_secure(&connection, body, network_error, sizeof(network_error)) ||
+            !receive_secure_any(&connection, server_body, action, sizeof(action),
+                                network_error, sizeof(network_error))) {
+            add_log(log_text, log_size, "Pending result kept for retry.\r\n");
+            goto cleanup;
+        }
+        if (!json_get_string(server_body, "task_id", progress_text, sizeof(progress_text)) ||
+            strcmp(progress_text, task_id) != 0 ||
+            (strcmp(action, "ACCEPTED") != 0 && strcmp(action, "RETAIN") != 0) ||
+            !outbox_resolve(&outbox, task_id, strcmp(action, "ACCEPTED") == 0)) {
+            add_log(log_text, log_size, "Pending result could not be reconciled.\r\n");
+            return_code = 2;
+            goto cleanup;
+        }
+        add_log(log_text, log_size, "Pending result reconciled: %s\r\n", action);
+    }
 
     /* 在线阶段：先发送一次心跳，确认连接可用后开始等待任务。 */
-    if (!send_heartbeat(server_socket, &session, server_body,
+    if (!send_heartbeat(&connection, login, executable_hash, preview, server_body,
                         network_error, sizeof(network_error))) {
         add_log(log_text, log_size, "Heartbeat: %s\r\n", network_error);
         goto cleanup;
@@ -277,7 +265,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     /* 任务循环：持续接收服务器消息；收到 WAIT 就等待并定期心跳，收到 TASK 就进入任务处理。 */
     while (!stop_requested) {
         if (keep_online) return_code = 1;
-        if (!receive_secure_any(server_socket, &session, server_body,
+        if (!receive_secure_any(&connection, server_body,
                                 action, sizeof(action),
                                 network_error, sizeof(network_error))) {
             add_log(log_text, log_size, "Server message: %s\r\n", network_error);
@@ -302,7 +290,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
             if (retry_after < 1 || retry_after > 5) retry_after = 2;
             Sleep((DWORD)(retry_after * 1000));
             if (stop_requested) break;
-            if (!send_heartbeat(server_socket, &session, server_body,
+            if (!send_heartbeat(&connection, login, executable_hash, preview, server_body,
                                 network_error, sizeof(network_error))) {
                 add_log(log_text, log_size, "Heartbeat: %s\r\n", network_error);
                 goto cleanup;
@@ -369,11 +357,22 @@ int run_client(const char *node_id, const char *mode, int keep_online,
             "\"node_id\":\"%s\",\"value\":%ld,"
             "\"merkle_root\":\"%s\",\"proof_steps\":\"%s\"}",
             task_id, node_id, result, merkle_root, proof_steps);
-        if (!send_secure(server_socket, &session, body,
+        if (!outbox_save(&outbox, body)) {
+            add_log(log_text, log_size, "Result could not be saved locally (system code %lu).\r\n", GetLastError());
+            return_code = 2;
+            goto cleanup;
+        }
+        if (!send_secure(&connection, body,
                          network_error, sizeof(network_error)) ||
-            !receive_secure(server_socket, &session, "ACCEPTED", server_body,
+            !receive_secure(&connection, "ACCEPTED", server_body,
                             network_error, sizeof(network_error))) {
             add_log(log_text, log_size, "Result submit: %s\r\n", network_error);
+            goto cleanup;
+        }
+        if (!json_get_string(server_body, "task_id", progress_text, sizeof(progress_text)) ||
+            strcmp(progress_text, task_id) != 0 || !outbox_resolve(&outbox, task_id, 1)) {
+            add_log(log_text, log_size, "Cannot retire pending result; it remains on disk.\r\n");
+            return_code = 2;
             goto cleanup;
         }
         add_log(log_text, log_size, "Result submit: accepted\r\n");
@@ -390,23 +389,24 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     }
 
     /* 退出阶段：持续在线模式在用户停止时通知服务器注销，然后统一关闭连接并清理敏感数据。 */
-    if (keep_online && server_socket != INVALID_SOCKET) {
-        send_logout(server_socket, &session, network_error, sizeof(network_error));
+    if (keep_online && authenticated && stop_requested) {
+        send_logout(&connection, network_error, sizeof(network_error));
         add_log(log_text, log_size, "Connection: disconnected by user\r\n");
     }
     return_code = 0;
 
 cleanup:
+    if (preview) preview->offer(NULL, "", "");
+    if (return_code == 1 && connection.security_error) return_code = 2;
     if (return_code != 0) {
-        report_progress(progress_callback, CLIENT_PROGRESS_ERROR,
-                        "Connection ended; retrying if enabled");
+        report_progress(progress_callback, CLIENT_PROGRESS_ERROR, return_code == 1 ?
+                        "Connection interrupted" : "Sign-in or security check needs attention");
     }
-    network_close(server_socket);
-    clear_sensitive(auth_text, sizeof(auth_text));
-    clear_sensitive(auth_tag, sizeof(auth_tag));
-    clear_sensitive(expected_proof, sizeof(expected_proof));
-    clear_node_credential(&credential);
-    clear_secure_session(&session);
+    network_close(&connection);
+    clear_sensitive(body, sizeof(body));
+    clear_sensitive(server_body, sizeof(server_body));
+    clear_sensitive(password_hex, sizeof(password_hex));
+    clear_sensitive(&outbox, sizeof(outbox));
     if (return_code == 0) {
         report_progress(progress_callback, CLIENT_PROGRESS_DISCONNECTED,
                         "Disconnected by user");

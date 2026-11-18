@@ -6,15 +6,18 @@ import json
 import secrets
 
 
+# 计算十六进制 HMAC-SHA-256 认证标签。
 def hmac_hex(key, text):
     return hmac.new(key, text.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+# 由长期认证密钥和本次握手参数派生会话密钥。
 def derive_session_key(auth_key, client_nonce, server_nonce, session_id):
     material = f"SESSION|{client_nonce}|{server_nonce}|{session_id}"
     return hmac.new(auth_key, material.encode("utf-8"), hashlib.sha256).digest()
 
 
+# 用 HMAC 和计数器生成加解密所需的密钥流。
 def _keystream(key, direction, session_id, sequence, nonce, size):
     output = bytearray()
     counter = 0
@@ -39,6 +42,7 @@ def _keystream(key, direction, session_id, sequence, nonce, size):
     return bytes(output[:size])
 
 
+# 异或加密消息正文，并生成认证标签和安全信封。
 def encrypt_message(key, direction, session_id, sequence, payload):
     plaintext = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":")
@@ -64,6 +68,7 @@ def encrypt_message(key, direction, session_id, sequence, payload):
     }
 
 
+# 检查会话、序号和标签，通过后解密并解析消息正文。
 def decrypt_message(key, direction, expected_session, expected_sequence, envelope):
     try:
         session_id = envelope["session_id"]
@@ -105,6 +110,7 @@ def decrypt_message(key, direction, expected_session, expected_sequence, envelop
     return value
 
 
+# 保存会话密钥，管理两个方向的消息序号和加解密入口。
 class SecureSession:
     def __init__(self, session_id, session_key):
         self.session_id = session_id

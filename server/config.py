@@ -34,6 +34,6 @@ MALICIOUS_WRONG_ROUNDS = 5
 IMPORTANT_TASK_MIN_REPUTATION = 60
 
 # 演示环境在首次运行时生成节点独立密钥，密钥只写入凭据文件，
-# 不写进源码和日志。许可证有效期足够覆盖课程演示周期。
+# 不写进源码和日志。许可证有效期贼长
 DEMO_CREDENTIAL_COUNT = 50
 LICENSE_EXPIRES = "2030-12-31"

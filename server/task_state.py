@@ -9,6 +9,7 @@ from config import TASK_ENABLED, TASK_ID_PREFIX
 class TaskState:
     def __init__(self):
         self.lock = threading.RLock()
+        # UUID 前 8 个十六进制字符（32 位短标识）用于区分本次任务批次，不是认证凭据。
         self.session_id = uuid.uuid4().hex[:8]
         self.round_number = 1
         self.task_results = {}
@@ -24,6 +25,7 @@ class TaskState:
         self.assigned_nodes = set()
 
     def get_task_id(self):
+        # 轮次补齐为 3 位，便于日志排序，例如 task-xxxxxxxx-001。
         return f"{TASK_ID_PREFIX}-{self.session_id}-{self.round_number:03d}"
 
     def start_next_round(self):

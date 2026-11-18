@@ -1,0 +1,552 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "项目 13 · 从启动到任务完成",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "work/function_manual/project_flow_20261114/交付文件/01-overview.html",
+    "repository": {
+      "url": "https://github.com/CTC343/Project-13.git",
+      "revision": "faddfa60ce6cc578b5b2d7025ee0bf7413e15308",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "control",
+      "label": "人工操作与控制中心"
+    },
+    {
+      "id": "server",
+      "label": "Python 服务端"
+    },
+    {
+      "id": "client",
+      "label": "Windows C 客户端（多个节点并发）"
+    },
+    {
+      "id": "records",
+      "label": "文件、审计与独立检查"
+    },
+    {
+      "id": "reject",
+      "label": "启动限制",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "power",
+      "lane": "control",
+      "col": 0,
+      "type": "external",
+      "label": "开机后手动打开",
+      "sublabel": "没有开机自动运行配置",
+      "sources": [
+        {
+          "path": "server/demo.py"
+        },
+        {
+          "path": "server/gui.py",
+          "line": 69,
+          "end_line": 70
+        }
+      ],
+      "icon": "start"
+    },
+    {
+      "id": "idle",
+      "lane": "control",
+      "col": 1,
+      "type": "frontend",
+      "label": "启动等待服务",
+      "sublabel": "先监听，不立即执行任务",
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 519,
+          "end_line": 522
+        },
+        {
+          "path": "server/process_manager.py",
+          "line": 35,
+          "end_line": 72
+        }
+      ]
+    },
+    {
+      "id": "enough",
+      "lane": "control",
+      "col": 2,
+      "type": "security",
+      "label": "在线节点足够？",
+      "sublabel": "设置运算、区间与冗余数",
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 260,
+          "end_line": 291
+        },
+        {
+          "path": "server/gui.py",
+          "line": 217,
+          "end_line": 258
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "restart",
+      "lane": "control",
+      "col": 3,
+      "type": "frontend",
+      "label": "重启为任务模式",
+      "sublabel": "参数通过环境变量传入",
+      "sources": [
+        {
+          "path": "server/process_manager.py",
+          "line": 91,
+          "end_line": 94
+        },
+        {
+          "path": "server/process_manager.py",
+          "line": 35,
+          "end_line": 72
+        },
+        {
+          "path": "server/gui.py",
+          "line": 260,
+          "end_line": 291
+        }
+      ]
+    },
+    {
+      "id": "view",
+      "lane": "control",
+      "col": 5,
+      "type": "frontend",
+      "label": "查看结果与记录",
+      "sublabel": "控制中心刷新状态和报告",
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 547,
+          "end_line": 555
+        },
+        {
+          "path": "server/gui.py",
+          "line": 720,
+          "end_line": 758
+        },
+        {
+          "path": "server/gui.py",
+          "line": 696,
+          "end_line": 718
+        }
+      ]
+    },
+    {
+      "id": "listen",
+      "lane": "server",
+      "col": 1,
+      "type": "messagebus",
+      "label": "监听并接入连接",
+      "sublabel": "127.0.0.1:8888 / 线程池",
+      "sources": [
+        {
+          "path": "server/server.py",
+          "line": 25,
+          "end_line": 30
+        },
+        {
+          "path": "server/server.py",
+          "line": 33,
+          "end_line": 56
+        }
+      ]
+    },
+    {
+      "id": "dispatch",
+      "lane": "server",
+      "col": 3,
+      "type": "backend",
+      "label": "分配本轮任务",
+      "sublabel": "重连先认证 / 后续沿用会话",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 154,
+          "end_line": 168
+        }
+      ]
+    },
+    {
+      "id": "vote",
+      "lane": "server",
+      "col": 4,
+      "type": "backend",
+      "label": "校验、表决、推进",
+      "sublabel": "每轮等待规定节点提交",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        }
+      ]
+    },
+    {
+      "id": "complete",
+      "lane": "server",
+      "col": 5,
+      "type": "backend",
+      "label": "全部子任务结束",
+      "sublabel": "保留结果，持续服务仍监听",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        },
+        {
+          "path": "server/server.py",
+          "line": 33,
+          "end_line": 56
+        }
+      ],
+      "icon": "success"
+    },
+    {
+      "id": "manual",
+      "lane": "client",
+      "col": 1,
+      "type": "external",
+      "label": "手动打开不同节点",
+      "sublabel": "输入节点 ID 后连接",
+      "sources": [
+        {
+          "path": "client/client_gui.c",
+          "line": 306,
+          "end_line": 339
+        },
+        {
+          "path": "client/client.c",
+          "line": 7,
+          "end_line": 30
+        }
+      ]
+    },
+    {
+      "id": "online",
+      "lane": "client",
+      "col": 2,
+      "type": "security",
+      "label": "认证后心跳等待",
+      "sublabel": "持续客户端等待任务",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    },
+    {
+      "id": "reconnect",
+      "lane": "client",
+      "col": 3,
+      "type": "messagebus",
+      "label": "重连并再次认证",
+      "sublabel": "旧服务停止导致连接中断",
+      "sources": [
+        {
+          "path": "client/client_gui.c",
+          "line": 340,
+          "end_line": 359
+        },
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    },
+    {
+      "id": "compute",
+      "lane": "client",
+      "col": 4,
+      "type": "security",
+      "label": "验签、计算、回传",
+      "sublabel": "四段计算与 Merkle 证明",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        },
+        {
+          "path": "client/merkle.c",
+          "line": 39,
+          "end_line": 72
+        }
+      ]
+    },
+    {
+      "id": "stay",
+      "lane": "client",
+      "col": 5,
+      "type": "backend",
+      "label": "等待后续任务或退出",
+      "sublabel": "持续模式与单次模式不同",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ],
+      "icon": "waiting"
+    },
+    {
+      "id": "provision",
+      "lane": "server",
+      "col": 0,
+      "type": "database",
+      "label": "部署时签发材料",
+      "sublabel": "RSA 密钥 / 凭据 / 程序白名单",
+      "sources": [
+        {
+          "path": "server/credential_store.py",
+          "line": 60,
+          "end_line": 90
+        },
+        {
+          "path": "server/rsa_keys.py",
+          "line": 46,
+          "end_line": 81
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "lane": "records",
+      "col": 4,
+      "type": "database",
+      "label": "审计、信誉与考核",
+      "sublabel": "审计落盘 / 信誉留在内存",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        },
+        {
+          "path": "server/audit.py",
+          "line": 19,
+          "end_line": 41
+        },
+        {
+          "path": "server/evaluation.py",
+          "line": 90,
+          "end_line": 93
+        }
+      ]
+    },
+    {
+      "id": "tests",
+      "lane": "records",
+      "col": 5,
+      "type": "security",
+      "label": "按需运行安全自检",
+      "sublabel": "独立于正常计算流程",
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 760,
+          "end_line": 767
+        },
+        {
+          "path": "server/security_tests.py",
+          "line": 169,
+          "end_line": 194
+        }
+      ]
+    },
+    {
+      "id": "shortage",
+      "lane": "reject",
+      "col": 2,
+      "type": "security",
+      "label": "不足则拒绝启动",
+      "sublabel": "提示还缺多少在线节点",
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 260,
+          "end_line": 291
+        }
+      ],
+      "icon": "failure"
+    }
+  ],
+  "edges": [
+    {
+      "id": "power--idle",
+      "from": "power",
+      "to": "idle",
+      "variant": "default"
+    },
+    {
+      "id": "idle--listen",
+      "from": "idle",
+      "to": "listen",
+      "variant": "default"
+    },
+    {
+      "id": "listen--manual",
+      "from": "listen",
+      "to": "manual",
+      "variant": "default",
+      "label": "手动连接"
+    },
+    {
+      "id": "manual--online",
+      "from": "manual",
+      "to": "online",
+      "variant": "default",
+      "label": "AUTH / 心跳"
+    },
+    {
+      "id": "online--enough",
+      "from": "online",
+      "to": "enough",
+      "variant": "default",
+      "label": "登记在线"
+    },
+    {
+      "id": "enough--restart",
+      "from": "enough",
+      "to": "restart",
+      "variant": "security",
+      "label": "足够"
+    },
+    {
+      "id": "enough--shortage",
+      "from": "enough",
+      "to": "shortage",
+      "variant": "security",
+      "label": "不足",
+      "role": "error"
+    },
+    {
+      "id": "restart--reconnect",
+      "from": "restart",
+      "to": "reconnect",
+      "variant": "default",
+      "label": "旧连接断开"
+    },
+    {
+      "id": "reconnect--dispatch",
+      "from": "reconnect",
+      "to": "dispatch",
+      "variant": "default",
+      "label": "重新 AUTH"
+    },
+    {
+      "id": "dispatch--compute",
+      "from": "dispatch",
+      "to": "compute",
+      "variant": "security",
+      "label": "签名 TASK"
+    },
+    {
+      "id": "compute--vote",
+      "from": "compute",
+      "to": "vote",
+      "variant": "security",
+      "label": "加密 RESULT"
+    },
+    {
+      "id": "vote--dispatch",
+      "from": "vote",
+      "to": "dispatch",
+      "variant": "dashed",
+      "label": "非末轮",
+      "role": "return"
+    },
+    {
+      "id": "vote--complete",
+      "from": "vote",
+      "to": "complete",
+      "variant": "default",
+      "label": "末轮"
+    },
+    {
+      "id": "vote--files",
+      "from": "vote",
+      "to": "files",
+      "variant": "default",
+      "label": "成功表决"
+    },
+    {
+      "id": "complete--stay",
+      "from": "complete",
+      "to": "stay",
+      "variant": "default"
+    },
+    {
+      "id": "files--view",
+      "from": "files",
+      "to": "view",
+      "variant": "default",
+      "label": "读取记录"
+    },
+    {
+      "id": "view--tests",
+      "from": "view",
+      "to": "tests",
+      "variant": "dashed",
+      "label": "用户点击",
+      "role": "branch"
+    },
+    {
+      "id": "provision--listen",
+      "from": "provision",
+      "to": "listen",
+      "variant": "dashed",
+      "label": "读取材料"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "如何读这张总览",
+      "items": [
+        "同一个子任务发给多个不同节点；服务端线程池并发处理连接，各客户端独立计算。",
+        "空闲服务和带任务服务是两个先后启动的进程：点击运行会停止旧服务，再启动新服务；持续客户端负责重连。",
+        "数字签名保护 TASK；加密安全信封保护任务、结果和心跳。",
+        "首次连接或重连才重新认证；同一条持续连接领取后续轮次时沿用会话，并继续递增序号。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "按当前实现理解",
+      "items": [
+        "客户端网络层仍有三个仅声明的接口；这张图追踪现有调用与分支，不代表当前源码已完整链接验证。",
+        "这里从开机后的人工启动开始；没有新增操作系统开机自启。",
+        "后续四张图展开认证、计算、表决和异常分支。"
+      ]
+    }
+  ]
+}

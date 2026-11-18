@@ -1,0 +1,62 @@
+{
+  "revision": "e684a9e2347741dda768147d619953af73f98160^",
+  "original_folder": "F:\\project13\\.archify\\architecture-project13-20261104-102440",
+  "backup_folder": "F:\\project13\\work\\recovery-original-flow-20261114-024657",
+  "restored_files": [
+    {
+      "path": ".archify/architecture-project13-20261104-102440/candidate.json",
+      "bytes": 7908,
+      "sha256": "ee96733875a4cf23c9b50873cbd5867fe5b17605b678def816dc71b9b4dd42e7",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/project13.browser-check.json",
+      "bytes": 8343,
+      "sha256": "85583e33ab72842e07b20d62f7cae3ede995d49397c089b0f1b6f25a5f6a7df8",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/project13.delivery.json",
+      "bytes": 591,
+      "sha256": "12cd061c68e170937ac49d227014b838afbe6d305e24e13dd2544425a8b3e796",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/project13.finalize-summary.json",
+      "bytes": 5037,
+      "sha256": "6f625b527eb3bad84c208cc7c63c2ca88e68f8aeccc6a816fc83993681eb1469",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/project13.finalize.json",
+      "bytes": 22385,
+      "sha256": "8587760d6626c9365f76907bcde090c9332663fdc484cc8f56844ccf324633c8",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/project13.html",
+      "bytes": 820724,
+      "sha256": "b81039a9648835025a34ec3b8753df4032fb3e6b19cb757738152d6aacfd4b97",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/review-2/project13.browser-check.json",
+      "bytes": 21941,
+      "sha256": "23f2211209bb8003bcace1f850d20b76d0add65fec9ba58b57b7daccbed7c35f",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/review-2/project13.finalize-summary.json",
+      "bytes": 3180,
+      "sha256": "8795793be952eba592b50f035846019b3d491cd5341c7071a429caeb7ec560de",
+      "state": "restored"
+    },
+    {
+      "path": ".archify/architecture-project13-20261104-102440/review-2/project13.finalize.json",
+      "bytes": 36620,
+      "sha256": "cfff666a24f11faa413f95f9b6d3048ad096a18319f493f9c0d4f8ff751579fc",
+      "state": "restored"
+    }
+  ],
+  "index_unchanged": true
+}

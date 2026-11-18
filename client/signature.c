@@ -20,6 +20,7 @@ static int read_public_key(char *modulus_hex, int modulus_size,
     int found_modulus = 0;
     int found_exponent = 0;
 
+    /* 公钥与客户端程序放在同一目录，便于部署；公钥只用于验签，可公开。 */
     if (length == 0 || length >= sizeof(executable)) return 0;
     snprintf(path, sizeof(path), "%s", executable);
     separator = strrchr(path, '\\');
@@ -48,6 +49,7 @@ static int exponent_bytes(unsigned long exponent, unsigned char output[8])
     unsigned char reverse[8];
     int count = 0;
     int index;
+    /* CNG 公钥结构要求指数按大端字节排列。 */
     while (exponent > 0) {
         reverse[count++] = (unsigned char)(exponent & 255);
         exponent >>= 8;
@@ -78,6 +80,7 @@ int verify_task_signature(const char *task_text, const char *signature_hex)
 
     if (task_text == NULL || signature_hex == NULL ||
         !read_public_key(modulus_hex, sizeof(modulus_hex), &exponent_value)) return 0;
+    /* 本项目使用 2048 位 RSA，签名固定为 256 字节（512 个十六进制字符）。 */
     modulus_size = (int)strlen(modulus_hex) / 2;
     if (modulus_size != 256 || strlen(signature_hex) != 512 ||
         !hex_to_bytes(signature_hex, signature, sizeof(signature))) return 0;
@@ -92,6 +95,7 @@ int verify_task_signature(const char *task_text, const char *signature_hex)
     header->cbModulus = (ULONG)modulus_size;
     memcpy(blob + sizeof(*header), exponent, exponent_size);
     modulus = blob + sizeof(*header) + exponent_size;
+    /* 验证的是任务文本的 SHA-256 签名；客户端仅持有公钥，不可签发任务。 */
     if (!hex_to_bytes(modulus_hex, modulus, modulus_size) ||
         !sha256_hex(task_text, digest_hex) ||
         !hex_to_bytes(digest_hex, digest, sizeof(digest))) goto cleanup;

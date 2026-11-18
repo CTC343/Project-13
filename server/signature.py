@@ -6,6 +6,7 @@ from rsa_keys import read_private_key
 
 
 SHA256_DIGEST_INFO_PREFIX = bytes.fromhex(
+    # DER 编码的 SHA-256 AlgorithmIdentifier 与 OCTET STRING 头，后接 32 字节摘要。
     "3031300d060960864801650304020105000420"
 )
 
@@ -17,10 +18,12 @@ def text_checksum(text):
 
 def sign_task(task_text):
     modulus, _, private_exponent, first_prime, second_prime = read_private_key()
+    # RSA 模数按字节向上取整；2048 位密钥对应 256 字节签名。
     key_size = (modulus.bit_length() + 7) // 8
     digest_info = SHA256_DIGEST_INFO_PREFIX + hashlib.sha256(
         task_text.encode("utf-8")
     ).digest()
+    # PKCS#1 v1.5 编码含 00 01、至少 8 个 FF、分隔 00 和 DigestInfo。
     padding_size = key_size - len(digest_info) - 3
     if padding_size < 8:
         raise ValueError("RSA key is too small for SHA-256 signature")

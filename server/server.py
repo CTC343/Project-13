@@ -24,8 +24,10 @@ from task_state import TaskState
 
 def create_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # 允许服务重启后快速重用本地端口，避免等待操作系统回收旧连接。
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((HOST, PORT))
+    # backlog 与线程池容量一致；超过容量的连接由操作系统排队/拒绝。
     server_socket.listen(MAX_CONCURRENT_CLIENTS)
     return server_socket
 
@@ -37,6 +39,7 @@ def serve(server_socket):
 
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_CLIENTS) as workers:
         while True:
+            # 每秒检查一次监听套接字；超时后回到循环，保持可响应的监听状态。
             readable, _, _ = select.select([server_socket], [], [], 1.0)
             if not readable:
                 continue
@@ -62,8 +65,10 @@ def validate_settings():
     number_count = TASK_END - TASK_START + 1
     if TASK_START > TASK_END or TOTAL_ROUNDS < 1:
         raise ValueError("invalid task range or subtask count")
+    # 每轮再由客户端拆成 4 段，因此每个子任务至少需要 4 个整数。
     if number_count < TOTAL_ROUNDS * 4:
         raise ValueError("each subtask needs at least four values")
+    # 至少 3 个独立结果才能形成有意义的严格多数（多数门槛为 floor(n/2)+1）。
     if REQUIRED_NODES < 3:
         raise ValueError("at least three nodes are required")
 

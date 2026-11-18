@@ -7,6 +7,7 @@ def choose_important_task_nodes(reputation_scores, malicious_nodes):
     eligible_nodes = []
 
     for node_id, score in reputation_scores.items():
+        # 信誉必须达到配置阈值，且不能已被识别为恶意节点。
         if score >= IMPORTANT_TASK_MIN_REPUTATION:
             if node_id not in malicious_nodes:
                 eligible_nodes.append(node_id)

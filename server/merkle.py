@@ -10,6 +10,7 @@ def hash_text(text):
 
 
 def build_merkle_root(step_values):
+    # 客户端固定提交 4 段；两两合并恰好形成两层父节点和一个根。
     leaf_hashes = [hash_text(str(value)) for value in step_values]
     left_hash = hash_text(leaf_hashes[0] + leaf_hashes[1])
     right_hash = hash_text(leaf_hashes[2] + leaf_hashes[3])
@@ -22,6 +23,7 @@ def verify_result_proof(operation, result_value, proof_text, expected_root):
     except ValueError:
         return False
 
+    # 固定要求 4 项，和客户端分段数一致，拒绝缺项或额外数据。
     if len(step_values) != 4:
         return False
     if merge_values(operation, step_values) != result_value:

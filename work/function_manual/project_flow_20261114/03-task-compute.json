@@ -1,0 +1,429 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "任务签名、客户端计算与结果回传",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "work/function_manual/project_flow_20261114/交付文件/03-task-compute.html",
+    "repository": {
+      "url": "https://github.com/CTC343/Project-13.git",
+      "revision": "faddfa60ce6cc578b5b2d7025ee0bf7413e15308",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "server",
+      "label": "服务端任务调度与签名"
+    },
+    {
+      "id": "client",
+      "label": "客户端执行与证明生成"
+    },
+    {
+      "id": "modes",
+      "label": "可选演示模式与阻断",
+      "variant": "exception"
+    },
+    {
+      "id": "transport",
+      "label": "传输层与后续处理"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "reserve",
+      "lane": "server",
+      "col": 0,
+      "type": "backend",
+      "label": "尝试预留本轮任务",
+      "sublabel": "当前有效、未领取且名额未满",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 154,
+          "end_line": 168
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "sign",
+      "lane": "server",
+      "col": 1,
+      "type": "security",
+      "label": "生成水印并 RSA 签名",
+      "sublabel": "任务 ID / 运算 / 起止区间",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        },
+        {
+          "path": "server/signature.py",
+          "line": 18,
+          "end_line": 39
+        },
+        {
+          "path": "server/task_state.py",
+          "line": 26,
+          "end_line": 27
+        }
+      ]
+    },
+    {
+      "id": "task",
+      "lane": "server",
+      "col": 2,
+      "type": "messagebus",
+      "label": "加密下发 TASK",
+      "sublabel": "四种运算之一与签名",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "lane": "client",
+      "col": 2,
+      "type": "security",
+      "label": "任务 RSA 验签通过？",
+      "sublabel": "公钥验证 RSA-2048 / SHA-256",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        },
+        {
+          "path": "client/signature.c",
+          "line": 59,
+          "end_line": 122
+        }
+      ],
+      "icon": "decision",
+      "yOffset": 60
+    },
+    {
+      "id": "calc",
+      "lane": "client",
+      "col": 3,
+      "type": "backend",
+      "label": "区间拆四段计算",
+      "sublabel": "求和 / 计数 / 最小 / 最大",
+      "sources": [
+        {
+          "path": "client/merkle.c",
+          "line": 39,
+          "end_line": 72
+        },
+        {
+          "path": "client/operations.c",
+          "line": 14,
+          "end_line": 37
+        }
+      ]
+    },
+    {
+      "id": "merkle",
+      "lane": "client",
+      "col": 4,
+      "type": "security",
+      "label": "合并并生成 Merkle 根",
+      "sublabel": "四步值 → 四叶 → 两父 → 根",
+      "sources": [
+        {
+          "path": "client/merkle.c",
+          "line": 39,
+          "end_line": 72
+        },
+        {
+          "path": "client/merkle.c",
+          "line": 10,
+          "end_line": 38
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "lane": "client",
+      "col": 5,
+      "type": "messagebus",
+      "label": "提交 RESULT",
+      "sublabel": "总值、四步值与根摘要",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    },
+    {
+      "id": "tamper",
+      "lane": "modes",
+      "col": 1,
+      "type": "security",
+      "label": "tamper 模式",
+      "sublabel": "验签前把任务终点加 1",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    },
+    {
+      "id": "bad",
+      "lane": "modes",
+      "col": 2,
+      "type": "security",
+      "label": "验签失败不执行",
+      "sublabel": "返回码 2，图形端停止重连",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        },
+        {
+          "path": "client/client_gui.c",
+          "line": 340,
+          "end_line": 359
+        }
+      ],
+      "icon": "failure"
+    },
+    {
+      "id": "wrong",
+      "lane": "modes",
+      "col": 3,
+      "type": "security",
+      "label": "wrong 模式",
+      "sublabel": "修改一步，再重建自洽证明",
+      "sources": [
+        {
+          "path": "client/merkle.c",
+          "line": 39,
+          "end_line": 72
+        },
+        {
+          "path": "client/operations.c",
+          "line": 65,
+          "end_line": 72
+        }
+      ]
+    },
+    {
+      "id": "wait",
+      "lane": "transport",
+      "col": 0,
+      "type": "messagebus",
+      "label": "无任务可领取",
+      "sublabel": "持续模式 WAIT；单次模式 409",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        }
+      ],
+      "icon": "waiting"
+    },
+    {
+      "id": "proof",
+      "lane": "transport",
+      "col": 5,
+      "type": "security",
+      "label": "进入服务端结果验证",
+      "sublabel": "详见结果表决图",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        }
+      ]
+    },
+    {
+      "id": "fields",
+      "lane": "client",
+      "col": 2,
+      "type": "security",
+      "icon": "decision",
+      "label": "任务字段有效？",
+      "sublabel": "必需字段 / 已知运算 / 区间",
+      "yOffset": -60,
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    },
+    {
+      "id": "invalid",
+      "lane": "modes",
+      "col": 0,
+      "type": "security",
+      "icon": "failure",
+      "label": "字段无效结束本次",
+      "sublabel": "返回 1；图形端一般会重连",
+      "sources": [
+        {
+          "path": "client/client_logic.c",
+          "line": 123,
+          "end_line": 404
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "reserve--sign",
+      "from": "reserve",
+      "to": "sign",
+      "variant": "default",
+      "label": "可分配"
+    },
+    {
+      "id": "reserve--wait",
+      "from": "reserve",
+      "to": "wait",
+      "variant": "dashed",
+      "label": "不可分配",
+      "role": "branch"
+    },
+    {
+      "id": "sign--task",
+      "from": "sign",
+      "to": "task",
+      "variant": "security",
+      "label": "签名 TASK"
+    },
+    {
+      "id": "verify--calc",
+      "from": "verify",
+      "to": "calc",
+      "variant": "security",
+      "label": "验签通过"
+    },
+    {
+      "id": "verify--bad",
+      "from": "verify",
+      "to": "bad",
+      "variant": "security",
+      "label": "失败",
+      "role": "error"
+    },
+    {
+      "id": "calc--merkle",
+      "from": "calc",
+      "to": "merkle",
+      "variant": "default",
+      "label": "normal"
+    },
+    {
+      "id": "calc--wrong",
+      "from": "calc",
+      "to": "wrong",
+      "variant": "dashed",
+      "label": "wrong",
+      "role": "branch"
+    },
+    {
+      "id": "wrong--merkle",
+      "from": "wrong",
+      "to": "merkle",
+      "variant": "default"
+    },
+    {
+      "id": "tamper--verify",
+      "from": "tamper",
+      "to": "verify",
+      "variant": "default",
+      "label": "改后再验"
+    },
+    {
+      "id": "merkle--result",
+      "from": "merkle",
+      "to": "result",
+      "variant": "default"
+    },
+    {
+      "id": "result--proof",
+      "from": "result",
+      "to": "proof",
+      "variant": "security",
+      "label": "加密上传"
+    },
+    {
+      "id": "task--fields",
+      "from": "task",
+      "to": "fields",
+      "variant": "default"
+    },
+    {
+      "id": "fields--verify",
+      "from": "fields",
+      "to": "verify",
+      "label": "有效",
+      "variant": "default"
+    },
+    {
+      "id": "fields--invalid",
+      "from": "fields",
+      "to": "invalid",
+      "label": "无效",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "fields--tamper",
+      "from": "fields",
+      "to": "tamper",
+      "label": "tamper",
+      "variant": "dashed",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "签名与证明分别保护什么",
+      "items": [
+        "签名文本为 task_id|operation|start|end，使用服务端私钥签名；客户端从 task_public.key 读取公钥。",
+        "任务 ID 含随机会话水印和轮次，任务区间按总区间与子任务数平衡划分。",
+        "步骤值转换为十进制字符串后做 SHA-256；拼接的是十六进制摘要文本。RESULT 携带全部四个步骤，不是抽样 Merkle 路径。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "当前实现边界",
+      "items": [
+        "实际领取函数检查任务状态、轮次、节点是否已领取和名额；没有使用低信誉或恶意节点名单阻止领取。",
+        "wrong 模式会提交自洽但错误的计算结果；Merkle 一致性可通过，最终正确性仍依赖多数表决。",
+        "四段是计算步骤；界面 25% / 50% / 75% / 100% 是流程阶段提示，不是逐段实时算量。",
+        "任务字段缺失、运算不支持或起止范围无效通常返回 1；只有任务签名验证失败走返回 2 的阻断分支。"
+      ]
+    }
+  ],
+  "mainPath": [
+    "reserve",
+    "sign",
+    "task",
+    "fields",
+    "verify",
+    "calc",
+    "merkle",
+    "result"
+  ]
+}

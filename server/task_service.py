@@ -36,6 +36,7 @@ from task_planner import get_subtask_range
 
 def choose_majority(task_results):
     result_counts = {}
+    # 严格多数须超过半数；偶数票数也不能把平票当成可信结果。
     required_votes = len(task_results) // 2 + 1
     for result_value in task_results.values():
         result_counts[result_value] = result_counts.get(result_value, 0) + 1
@@ -55,6 +56,7 @@ def update_reputation(task_results, trusted_value, task_state):
             wrong_count = task_state.wrong_rounds.get(node_id, 0) + 1
             task_state.wrong_rounds[node_id] = wrong_count
             print(f"Wrong rounds: {node_id} -> {wrong_count}", flush=True)
+            # 累计错误轮数达到阈值后加入恶意节点集合；正确轮次不会清零该计数。
             if wrong_count == MALICIOUS_WRONG_ROUNDS:
                 task_state.malicious_nodes.add(node_id)
                 print(f"Malicious node detected: {node_id}", flush=True)
@@ -152,6 +154,7 @@ def _receive_secure_any(client_socket, session):
 
 
 def _try_reserve_task(node_id, last_round, task_state):
+    # 锁内检查并登记节点，避免并发连接给同一节点或超额节点重复派发。
     with task_state.lock:
         if task_state.completed:
             return None
@@ -179,6 +182,7 @@ def _store_result(node_id, payload, task_info, task_state):
     except (KeyError, TypeError, ValueError):
         raise ProtocolError("invalid result body", STATUS_UNPROCESSABLE) from None
 
+    # 证明负责校验“分段值、总值、Merkle 根”相互一致，不单独证明计算过程真实。
     if not verify_result_proof(
         TASK_OPERATION, result_value, proof_steps, merkle_root
     ):
@@ -222,6 +226,7 @@ def handle_client(client_socket, client_address, task_state,
     result_stored = False
     persistent = False
     last_round = 0
+    # 8 秒 socket I/O 超时，防止客户端连接后长期占住工作线程。
     client_socket.settimeout(8)
 
     try:
@@ -268,6 +273,7 @@ def handle_client(client_socket, client_address, task_state,
                 )
                 with task_state.lock:
                     all_complete = task_state.completed
+                # 每 2 秒提示客户端再次心跳；短轮询便于快速响应任务和断开请求。
                 _send_secure(
                     client_socket, session, "WAIT",
                     retry_after=2, all_complete=all_complete
@@ -331,6 +337,7 @@ def handle_client(client_socket, client_address, task_state,
             pass
     except (ProtocolError, socket.timeout) as error:
         detail = str(error) or "socket timeout"
+        # 未显式附带状态码的协议错误按“内容无法处理”返回 422。
         status = getattr(error, "status", STATUS_UNPROCESSABLE)
         record_security_event("REQUEST_REJECTED", node_id, address_text, detail)
         try:

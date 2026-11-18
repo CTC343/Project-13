@@ -1,0 +1,622 @@
+{
+  "server/audit.py:save_round": {
+    "path": "server/audit.py",
+    "line": 19,
+    "end_line": 41
+  },
+  "server/audit.py:read_rounds": {
+    "path": "server/audit.py",
+    "line": 44,
+    "end_line": 56
+  },
+  "server/config.py:read_int": {
+    "path": "server/config.py",
+    "line": 6,
+    "end_line": 10
+  },
+  "server/credential_store.py:file_sha256": {
+    "path": "server/credential_store.py",
+    "line": 22,
+    "end_line": 27
+  },
+  "server/credential_store.py:_read_store": {
+    "path": "server/credential_store.py",
+    "line": 30,
+    "end_line": 36
+  },
+  "server/credential_store.py:_write_store": {
+    "path": "server/credential_store.py",
+    "line": 39,
+    "end_line": 43
+  },
+  "server/credential_store.py:_write_client_credential": {
+    "path": "server/credential_store.py",
+    "line": 46,
+    "end_line": 57
+  },
+  "server/credential_store.py:provision_demo_credentials": {
+    "path": "server/credential_store.py",
+    "line": 60,
+    "end_line": 90
+  },
+  "server/credential_store.py:__init__": {
+    "path": "server/credential_store.py",
+    "line": 94,
+    "end_line": 98
+  },
+  "server/credential_store.py:_remove_old_nonces": {
+    "path": "server/credential_store.py",
+    "line": 100,
+    "end_line": 105
+  },
+  "server/credential_store.py:authenticate": {
+    "path": "server/credential_store.py",
+    "line": 107,
+    "end_line": 157
+  },
+  "server/credential_store.py:create_session": {
+    "path": "server/credential_store.py",
+    "line": 159,
+    "end_line": 167
+  },
+  "server/evaluation.py:standard_answer": {
+    "path": "server/evaluation.py",
+    "line": 25,
+    "end_line": 26
+  },
+  "server/evaluation.py:slow_sum": {
+    "path": "server/evaluation.py",
+    "line": 29,
+    "end_line": 33
+  },
+  "server/evaluation.py:measure_security_overhead": {
+    "path": "server/evaluation.py",
+    "line": 36,
+    "end_line": 64
+  },
+  "server/evaluation.py:create_evaluation_report": {
+    "path": "server/evaluation.py",
+    "line": 67,
+    "end_line": 87
+  },
+  "server/evaluation.py:save_evaluation_report": {
+    "path": "server/evaluation.py",
+    "line": 90,
+    "end_line": 93
+  },
+  "server/evaluation.py:read_evaluation_report": {
+    "path": "server/evaluation.py",
+    "line": 96,
+    "end_line": 101
+  },
+  "server/gui.py:node_is_available": {
+    "path": "server/gui.py",
+    "line": 29,
+    "end_line": 34
+  },
+  "server/gui.py:missing_online_nodes": {
+    "path": "server/gui.py",
+    "line": 37,
+    "end_line": 38
+  },
+  "server/gui.py:check_files": {
+    "path": "server/gui.py",
+    "line": 802,
+    "end_line": 818
+  },
+  "server/gui.py:__init__": {
+    "path": "server/gui.py",
+    "line": 42,
+    "end_line": 67
+  },
+  "server/gui.py:run": {
+    "path": "server/gui.py",
+    "line": 69,
+    "end_line": 70
+  },
+  "server/gui.py:_configure_style": {
+    "path": "server/gui.py",
+    "line": 72,
+    "end_line": 79
+  },
+  "server/gui.py:_build_page": {
+    "path": "server/gui.py",
+    "line": 81,
+    "end_line": 120
+  },
+  "server/gui.py:_build_control_tab": {
+    "path": "server/gui.py",
+    "line": 122,
+    "end_line": 158
+  },
+  "server/gui.py:_build_operation_form": {
+    "path": "server/gui.py",
+    "line": 160,
+    "end_line": 215
+  },
+  "server/gui.py:_read_operation_settings": {
+    "path": "server/gui.py",
+    "line": 217,
+    "end_line": 258
+  },
+  "server/gui.py:_run_operation": {
+    "path": "server/gui.py",
+    "line": 260,
+    "end_line": 291
+  },
+  "server/gui.py:_build_result_tab": {
+    "path": "server/gui.py",
+    "line": 293,
+    "end_line": 320
+  },
+  "server/gui.py:_build_log_tab": {
+    "path": "server/gui.py",
+    "line": 322,
+    "end_line": 332
+  },
+  "server/gui.py:_build_node_tab": {
+    "path": "server/gui.py",
+    "line": 334,
+    "end_line": 358
+  },
+  "server/gui.py:_build_audit_tab": {
+    "path": "server/gui.py",
+    "line": 360,
+    "end_line": 410
+  },
+  "server/gui.py:_build_evaluation_tab": {
+    "path": "server/gui.py",
+    "line": 412,
+    "end_line": 438
+  },
+  "server/gui.py:_build_security_tab": {
+    "path": "server/gui.py",
+    "line": 440,
+    "end_line": 477
+  },
+  "server/gui.py:_build_future_tab": {
+    "path": "server/gui.py",
+    "line": 479,
+    "end_line": 517
+  },
+  "server/gui.py:_start_server": {
+    "path": "server/gui.py",
+    "line": 519,
+    "end_line": 522
+  },
+  "server/gui.py:_stop_server": {
+    "path": "server/gui.py",
+    "line": 524,
+    "end_line": 529
+  },
+  "server/gui.py:_clear_node_status": {
+    "path": "server/gui.py",
+    "line": 531,
+    "end_line": 536
+  },
+  "server/gui.py:_clear_results": {
+    "path": "server/gui.py",
+    "line": 538,
+    "end_line": 545
+  },
+  "server/gui.py:_read_events": {
+    "path": "server/gui.py",
+    "line": 547,
+    "end_line": 555
+  },
+  "server/gui.py:_handle_event": {
+    "path": "server/gui.py",
+    "line": 557,
+    "end_line": 575
+  },
+  "server/gui.py:_read_server_line": {
+    "path": "server/gui.py",
+    "line": 577,
+    "end_line": 635
+  },
+  "server/gui.py:_set_node_value": {
+    "path": "server/gui.py",
+    "line": 637,
+    "end_line": 656
+  },
+  "server/gui.py:_set_status_value": {
+    "path": "server/gui.py",
+    "line": 658,
+    "end_line": 688
+  },
+  "server/gui.py:_append_log": {
+    "path": "server/gui.py",
+    "line": 690,
+    "end_line": 694
+  },
+  "server/gui.py:_refresh_audit": {
+    "path": "server/gui.py",
+    "line": 696,
+    "end_line": 718
+  },
+  "server/gui.py:_refresh_evaluation": {
+    "path": "server/gui.py",
+    "line": 720,
+    "end_line": 758
+  },
+  "server/gui.py:_run_security_tests": {
+    "path": "server/gui.py",
+    "line": 760,
+    "end_line": 767
+  },
+  "server/gui.py:_refresh_security": {
+    "path": "server/gui.py",
+    "line": 769,
+    "end_line": 795
+  },
+  "server/gui.py:_close_window": {
+    "path": "server/gui.py",
+    "line": 797,
+    "end_line": 799
+  },
+  "server/merkle.py:hash_text": {
+    "path": "server/merkle.py",
+    "line": 8,
+    "end_line": 9
+  },
+  "server/merkle.py:build_merkle_root": {
+    "path": "server/merkle.py",
+    "line": 12,
+    "end_line": 16
+  },
+  "server/merkle.py:verify_result_proof": {
+    "path": "server/merkle.py",
+    "line": 19,
+    "end_line": 30
+  },
+  "server/node_registry.py:__init__": {
+    "path": "server/node_registry.py",
+    "line": 8,
+    "end_line": 10
+  },
+  "server/node_registry.py:update": {
+    "path": "server/node_registry.py",
+    "line": 12,
+    "end_line": 37
+  },
+  "server/node_registry.py:snapshot": {
+    "path": "server/node_registry.py",
+    "line": 39,
+    "end_line": 41
+  },
+  "server/operations.py:is_supported": {
+    "path": "server/operations.py",
+    "line": 12,
+    "end_line": 13
+  },
+  "server/operations.py:operation_label": {
+    "path": "server/operations.py",
+    "line": 16,
+    "end_line": 20
+  },
+  "server/operations.py:merge_values": {
+    "path": "server/operations.py",
+    "line": 23,
+    "end_line": 34
+  },
+  "server/operations.py:expected_result": {
+    "path": "server/operations.py",
+    "line": 37,
+    "end_line": 48
+  },
+  "server/process_manager.py:__init__": {
+    "path": "server/process_manager.py",
+    "line": 20,
+    "end_line": 24
+  },
+  "server/process_manager.py:default_task_settings": {
+    "path": "server/process_manager.py",
+    "line": 26,
+    "end_line": 33
+  },
+  "server/process_manager.py:start_server": {
+    "path": "server/process_manager.py",
+    "line": 35,
+    "end_line": 72
+  },
+  "server/process_manager.py:stop_server": {
+    "path": "server/process_manager.py",
+    "line": 74,
+    "end_line": 89
+  },
+  "server/process_manager.py:restart_server": {
+    "path": "server/process_manager.py",
+    "line": 91,
+    "end_line": 94
+  },
+  "server/process_manager.py:open_client_window": {
+    "path": "server/process_manager.py",
+    "line": 96,
+    "end_line": 103
+  },
+  "server/process_manager.py:is_server_running": {
+    "path": "server/process_manager.py",
+    "line": 105,
+    "end_line": 109
+  },
+  "server/process_manager.py:_read_server_output": {
+    "path": "server/process_manager.py",
+    "line": 111,
+    "end_line": 123
+  },
+  "server/protocol.py:_receive_until_newline": {
+    "path": "server/protocol.py",
+    "line": 24,
+    "end_line": 34
+  },
+  "server/protocol.py:_receive_exact": {
+    "path": "server/protocol.py",
+    "line": 37,
+    "end_line": 45
+  },
+  "server/protocol.py:receive_frame": {
+    "path": "server/protocol.py",
+    "line": 48,
+    "end_line": 78
+  },
+  "server/protocol.py:send_frame": {
+    "path": "server/protocol.py",
+    "line": 81,
+    "end_line": 93
+  },
+  "server/protocol.py:send_error": {
+    "path": "server/protocol.py",
+    "line": 96,
+    "end_line": 98
+  },
+  "server/protocol.py:__init__": {
+    "path": "server/protocol.py",
+    "line": 19,
+    "end_line": 21
+  },
+  "server/rsa_keys.py:_probably_prime": {
+    "path": "server/rsa_keys.py",
+    "line": 15,
+    "end_line": 34
+  },
+  "server/rsa_keys.py:_generate_prime": {
+    "path": "server/rsa_keys.py",
+    "line": 37,
+    "end_line": 43
+  },
+  "server/rsa_keys.py:ensure_task_signing_keys": {
+    "path": "server/rsa_keys.py",
+    "line": 46,
+    "end_line": 81
+  },
+  "server/rsa_keys.py:read_private_key": {
+    "path": "server/rsa_keys.py",
+    "line": 84,
+    "end_line": 93
+  },
+  "server/scheduler.py:choose_important_task_nodes": {
+    "path": "server/scheduler.py",
+    "line": 6,
+    "end_line": 14
+  },
+  "server/secure_channel.py:hmac_hex": {
+    "path": "server/secure_channel.py",
+    "line": 9,
+    "end_line": 10
+  },
+  "server/secure_channel.py:derive_session_key": {
+    "path": "server/secure_channel.py",
+    "line": 13,
+    "end_line": 15
+  },
+  "server/secure_channel.py:_keystream": {
+    "path": "server/secure_channel.py",
+    "line": 18,
+    "end_line": 37
+  },
+  "server/secure_channel.py:encrypt_message": {
+    "path": "server/secure_channel.py",
+    "line": 40,
+    "end_line": 61
+  },
+  "server/secure_channel.py:decrypt_message": {
+    "path": "server/secure_channel.py",
+    "line": 64,
+    "end_line": 101
+  },
+  "server/secure_channel.py:__init__": {
+    "path": "server/secure_channel.py",
+    "line": 105,
+    "end_line": 109
+  },
+  "server/secure_channel.py:protect_server_message": {
+    "path": "server/secure_channel.py",
+    "line": 111,
+    "end_line": 116
+  },
+  "server/secure_channel.py:open_client_message": {
+    "path": "server/secure_channel.py",
+    "line": 118,
+    "end_line": 127
+  },
+  "server/security_audit.py:record_security_event": {
+    "path": "server/security_audit.py",
+    "line": 15,
+    "end_line": 27
+  },
+  "server/security_audit.py:read_security_events": {
+    "path": "server/security_audit.py",
+    "line": 30,
+    "end_line": 40
+  },
+  "server/security_tests.py:check": {
+    "path": "server/security_tests.py",
+    "line": 21,
+    "end_line": 26
+  },
+  "server/security_tests.py:test_encrypted_roundtrip": {
+    "path": "server/security_tests.py",
+    "line": 29,
+    "end_line": 34
+  },
+  "server/security_tests.py:test_tamper_rejected": {
+    "path": "server/security_tests.py",
+    "line": 37,
+    "end_line": 46
+  },
+  "server/security_tests.py:test_replay_rejected": {
+    "path": "server/security_tests.py",
+    "line": 49,
+    "end_line": 57
+  },
+  "server/security_tests.py:make_auth_request": {
+    "path": "server/security_tests.py",
+    "line": 60,
+    "end_line": 77
+  },
+  "server/security_tests.py:test_identity_spoof_rejected": {
+    "path": "server/security_tests.py",
+    "line": 80,
+    "end_line": 87
+  },
+  "server/security_tests.py:test_auth_replay_rejected": {
+    "path": "server/security_tests.py",
+    "line": 90,
+    "end_line": 98
+  },
+  "server/security_tests.py:test_sticky_and_fragmented_frames": {
+    "path": "server/security_tests.py",
+    "line": 101,
+    "end_line": 112
+  },
+  "server/security_tests.py:test_oversized_body_rejected": {
+    "path": "server/security_tests.py",
+    "line": 115,
+    "end_line": 127
+  },
+  "server/security_tests.py:test_executable_allowlist": {
+    "path": "server/security_tests.py",
+    "line": 130,
+    "end_line": 136
+  },
+  "server/security_tests.py:test_rsa_task_signature": {
+    "path": "server/security_tests.py",
+    "line": 139,
+    "end_line": 153
+  },
+  "server/security_tests.py:test_no_dangerous_calls": {
+    "path": "server/security_tests.py",
+    "line": 156,
+    "end_line": 166
+  },
+  "server/security_tests.py:create_report": {
+    "path": "server/security_tests.py",
+    "line": 169,
+    "end_line": 194
+  },
+  "server/security_tests.py:read_security_test_report": {
+    "path": "server/security_tests.py",
+    "line": 197,
+    "end_line": 200
+  },
+  "server/server.py:create_server": {
+    "path": "server/server.py",
+    "line": 25,
+    "end_line": 30
+  },
+  "server/server.py:serve": {
+    "path": "server/server.py",
+    "line": 33,
+    "end_line": 56
+  },
+  "server/server.py:validate_settings": {
+    "path": "server/server.py",
+    "line": 59,
+    "end_line": 68
+  },
+  "server/server.py:main": {
+    "path": "server/server.py",
+    "line": 71,
+    "end_line": 89
+  },
+  "server/server.py:run_client": {
+    "path": "server/server.py",
+    "line": 49,
+    "end_line": 54
+  },
+  "server/signature.py:text_checksum": {
+    "path": "server/signature.py",
+    "line": 13,
+    "end_line": 15
+  },
+  "server/signature.py:sign_task": {
+    "path": "server/signature.py",
+    "line": 18,
+    "end_line": 39
+  },
+  "server/task_planner.py:get_subtask_range": {
+    "path": "server/task_planner.py",
+    "line": 6,
+    "end_line": 10
+  },
+  "server/task_service.py:choose_majority": {
+    "path": "server/task_service.py",
+    "line": 37,
+    "end_line": 45
+  },
+  "server/task_service.py:update_reputation": {
+    "path": "server/task_service.py",
+    "line": 48,
+    "end_line": 62
+  },
+  "server/task_service.py:finish_task": {
+    "path": "server/task_service.py",
+    "line": 65,
+    "end_line": 124
+  },
+  "server/task_service.py:_send_secure": {
+    "path": "server/task_service.py",
+    "line": 127,
+    "end_line": 133
+  },
+  "server/task_service.py:_receive_secure": {
+    "path": "server/task_service.py",
+    "line": 136,
+    "end_line": 140
+  },
+  "server/task_service.py:_receive_secure_any": {
+    "path": "server/task_service.py",
+    "line": 143,
+    "end_line": 151
+  },
+  "server/task_service.py:_try_reserve_task": {
+    "path": "server/task_service.py",
+    "line": 154,
+    "end_line": 168
+  },
+  "server/task_service.py:_store_result": {
+    "path": "server/task_service.py",
+    "line": 171,
+    "end_line": 213
+  },
+  "server/task_service.py:handle_client": {
+    "path": "server/task_service.py",
+    "line": 216,
+    "end_line": 364
+  },
+  "server/task_state.py:__init__": {
+    "path": "server/task_state.py",
+    "line": 10,
+    "end_line": 24
+  },
+  "server/task_state.py:get_task_id": {
+    "path": "server/task_state.py",
+    "line": 26,
+    "end_line": 27
+  },
+  "server/task_state.py:start_next_round": {
+    "path": "server/task_state.py",
+    "line": 29,
+    "end_line": 33
+  }
+}

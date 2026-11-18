@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Project 13：分布式计算与结果审计",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-project13-20261104-102440/project13.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/CTC343/Project-13.git",
+      "revision": "64dd05544a68af6b538ca051b9ca7a62b5c69318",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "control",
+      "type": "frontend",
+      "label": "服务端控制中心",
+      "sublabel": "选择运算、区间和每轮节点数",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        188,
+        76
+      ],
+      "sources": [
+        {
+          "path": "server/gui.py",
+          "line": 260,
+          "end_line": 291,
+          "label": "在线节点数检查"
+        },
+        {
+          "path": "server/process_manager.py",
+          "line": 35,
+          "end_line": 72,
+          "label": "启动子进程并传递配置"
+        },
+        {
+          "path": "server/process_manager.py",
+          "line": 91,
+          "end_line": 123,
+          "label": "重启及标准输出回传"
+        }
+      ]
+    },
+    {
+      "id": "tcp-service",
+      "type": "backend",
+      "label": "Python 服务进程",
+      "sublabel": "TCP 127.0.0.1:8888 · 线程池",
+      "pos": [
+        398,
+        40
+      ],
+      "size": [
+        200,
+        76
+      ],
+      "sources": [
+        {
+          "path": "server/server.py",
+          "line": 25,
+          "end_line": 56,
+          "label": "监听与连接处理"
+        },
+        {
+          "path": "server/config.py",
+          "line": 12,
+          "end_line": 28,
+          "label": "监听地址与任务配置"
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 255,
+          "label": "会话建立与在线状态"
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "frontend",
+      "label": "Windows C 计算节点",
+      "sublabel": "手动连接 · 验签后计算四段证明",
+      "pos": [
+        790,
+        40
+      ],
+      "size": [
+        205,
+        76
+      ],
+      "sources": [
+        {
+          "path": "client/client_gui.c",
+          "line": 306,
+          "end_line": 358,
+          "label": "手动连接及重连"
+        },
+        {
+          "path": "client/client_logic.c",
+          "line": 223,
+          "end_line": 301,
+          "label": "验证服务端与等待心跳"
+        },
+        {
+          "path": "client/client_logic.c",
+          "line": 318,
+          "end_line": 378,
+          "label": "任务验签、计算及回传"
+        }
+      ]
+    },
+    {
+      "id": "authentication",
+      "type": "security",
+      "label": "凭据与安全会话",
+      "sublabel": "许可证 · HMAC · 严格序号",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        188,
+        76
+      ],
+      "sources": [
+        {
+          "path": "server/credential_store.py",
+          "line": 93,
+          "end_line": 166,
+          "label": "登录校验与会话密钥"
+        },
+        {
+          "path": "server/secure_channel.py",
+          "line": 64,
+          "end_line": 101,
+          "label": "信封校验与解密"
+        },
+        {
+          "path": "server/credential_store.py",
+          "line": 17,
+          "end_line": 36,
+          "label": "读取本地凭据注册表"
+        }
+      ]
+    },
+    {
+      "id": "rounds",
+      "type": "backend",
+      "label": "任务分发与表决",
+      "sublabel": "拆分区间 · 严格多数 · 内存轮次",
+      "pos": [
+        398,
+        250
+      ],
+      "size": [
+        200,
+        76
+      ],
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 154,
+          "end_line": 213,
+          "label": "分配名额、校验证明、推进轮次"
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 257,
+          "end_line": 320,
+          "label": "等待、任务签名与结果接收"
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 37,
+          "end_line": 124,
+          "label": "严格多数、合并、信誉及审计"
+        }
+      ]
+    },
+    {
+      "id": "round-records",
+      "type": "database",
+      "label": "业务审计与考核文件",
+      "sublabel": "audit.jsonl · evaluation.json",
+      "pos": [
+        790,
+        250
+      ],
+      "size": [
+        205,
+        76
+      ],
+      "sources": [
+        {
+          "path": "server/audit.py",
+          "line": 16,
+          "end_line": 41,
+          "label": "按轮追加业务审计"
+        },
+        {
+          "path": "server/evaluation.py",
+          "line": 20,
+          "end_line": 23,
+          "label": "考核文件位置"
+        },
+        {
+          "path": "server/evaluation.py",
+          "line": 90,
+          "end_line": 93,
+          "label": "保存考核报告"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "start-run",
+      "from": "control",
+      "to": "tcp-service",
+      "label": "节点够数后重启并派发",
+      "variant": "emphasis"
+    },
+    {
+      "id": "report-run",
+      "from": "tcp-service",
+      "to": "control",
+      "label": "标准输出：节点状态、结果"
+    },
+    {
+      "id": "node-request",
+      "from": "worker",
+      "to": "tcp-service",
+      "label": "P13/1：认证、心跳、结果",
+      "variant": "emphasis"
+    },
+    {
+      "id": "node-response",
+      "from": "tcp-service",
+      "to": "worker",
+      "label": "安全会话：等待、签名任务、确认",
+      "variant": "emphasis"
+    },
+    {
+      "id": "secure-entry",
+      "from": "tcp-service",
+      "to": "authentication",
+      "label": "认证并建立安全会话",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "id": "authorized-work",
+      "from": "tcp-service",
+      "to": "rounds",
+      "label": "认证和心跳后进入任务循环",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write-reports",
+      "from": "rounds",
+      "to": "round-records",
+      "label": "逐轮记审计；末轮成功写考核"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "从等待到计算",
+      "items": [
+        "控制中心先启动等待模式；操作员手动打开客户端，并用不同节点 ID 登录。节点数达到每轮配置后，控制中心用新参数重启服务端，图形客户端会自动重连。",
+        "服务端把区间拆成多轮，每轮至少需要三个不同节点。没有名额的常驻客户端收到 WAIT，按提示发送心跳。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "信任检查",
+      "items": [
+        "登录检查许可证、时间窗、防重放随机数和 HMAC；配置了程序哈希白名单时才检查可执行文件哈希。认证后的消息校验方向、序号和认证标签。",
+        "服务端以 RSA 签名任务 ID、运算与范围；客户端先验签，再计算并提交 Merkle 证明。服务端校验任务和节点身份、证明、当前轮次与重复提交。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "如何确定结果",
+      "items": [
+        "收齐本轮结果才表决。超过半数一致才合并进总结果并更新信誉；无严格多数时记录失败，轮次仍会推进或结束。",
+        "信誉和任务轮次随服务进程重建。重要任务资格单独计算；当前普通子任务的名额分配不按这份名单筛选。",
+        "登录、拒绝和网络错误等安全事件另写入 data/security_audit.jsonl（server/task_service.py:318–347；server/security_audit.py:9–27）。"
+      ]
+    }
+  ]
+}

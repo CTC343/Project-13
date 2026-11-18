@@ -36,6 +36,7 @@ def merge_values(operation, values):
 
 def expected_result(operation, start, end):
     if operation == "SUM_RANGE":
+        # 等差数列首尾配对求和；闭区间项数为 end-start+1。
         number_count = end - start + 1
         return (start + end) * number_count // 2
     if operation == "COUNT_RANGE":

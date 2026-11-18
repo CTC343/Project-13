@@ -22,6 +22,7 @@ CLIENT_CREDENTIAL_DIR = PROJECT_ROOT / "client" / "credentials"
 def file_sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as input_file:
+        # 64 KiB 分块，控制内存占用；SHA-256 更新可连续处理任意长度文件。
         for block in iter(lambda: input_file.read(65536), b""):
             digest.update(block)
     return digest.hexdigest()
@@ -67,6 +68,7 @@ def provision_demo_credentials(refresh_hashes=False):
     node_ids.extend(["node-ui", "node-1", "node-2", "node-3"])
 
     executable_hashes = []
+    # 同时登记控制台和 GUI 两种客户端构建的哈希。
     for name in ("client.exe", "client_gui.exe"):
         path = PROJECT_ROOT / "client" / name
         if path.exists():
@@ -78,6 +80,7 @@ def provision_demo_credentials(refresh_hashes=False):
             record = {
                 "license_id": "lic-" + secrets.token_hex(12),
                 "expires": LICENSE_EXPIRES,
+                # token_hex(32) 生成 32 个随机字节并编码为 64 个十六进制字符。
                 "auth_key": secrets.token_hex(32),
                 "allowed_exe_hashes": executable_hashes,
             }
@@ -98,6 +101,7 @@ class CredentialStore:
         self.lock = threading.Lock()
 
     def _remove_old_nonces(self, now):
+        # 保留时间取认证时间窗的两倍，为边界时钟偏差留余量并清理旧随机数。
         oldest = now - AUTH_TIME_WINDOW_SECONDS * 2
         self.used_nonces = {
             nonce: seen_at for nonce, seen_at in self.used_nonces.items()
@@ -118,6 +122,7 @@ class CredentialStore:
 
         if not isinstance(node_id, str) or not node_id:
             raise ValueError("invalid node id")
+        # nonce 是 16 字节的十六进制文本（32 字符）；SHA-256 是 32 字节（64 字符）。
         if len(client_nonce) != 32 or len(exe_hash) != 64:
             raise ValueError("invalid authentication value length")
 
@@ -157,6 +162,7 @@ class CredentialStore:
         return auth_key
 
     def create_session(self, auth_key, client_nonce):
+        # 12 字节会话随机 ID（24 个十六进制字符）；服务器 nonce 为 16 字节。
         session_id = secrets.token_hex(12)
         server_nonce = secrets.token_hex(16)
         session_key = derive_session_key(

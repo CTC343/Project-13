@@ -1,0 +1,389 @@
+{
+  "client/client.c": {
+    "main": {
+      "signature": "int main(int argc, char *argv[]);",
+      "params": "int argc, char *argv[]"
+    }
+  },
+  "client/client_logic.c": {
+    "request_client_stop": {
+      "signature": "void request_client_stop(void);",
+      "params": "void"
+    },
+    "report_progress": {
+      "signature": "static void report_progress(ClientProgressCallback callback, int progress_code, const char *detail);",
+      "params": "ClientProgressCallback callback, int progress_code, const char *detail"
+    },
+    "valid_node_id": {
+      "signature": "static int valid_node_id(const char *node_id);",
+      "params": "const char *node_id"
+    },
+    "receive_secure_any": {
+      "signature": "static int receive_secure_any(SOCKET socket_value, SecureSession *session, char *plain, char *action, int action_size, char *error_text, int error_size);",
+      "params": "SOCKET socket_value, SecureSession *session, char *plain, char *action, int action_size, char *error_text, int error_size"
+    },
+    "receive_secure": {
+      "signature": "static int receive_secure(SOCKET socket_value, SecureSession *session, const char *expected_action, char *plain, char *error_text, int error_size);",
+      "params": "SOCKET socket_value, SecureSession *session, const char *expected_action, char *plain, char *error_text, int error_size"
+    },
+    "send_secure": {
+      "signature": "static int send_secure(SOCKET socket_value, SecureSession *session, const char *plain, char *error_text, int error_size);",
+      "params": "SOCKET socket_value, SecureSession *session, const char *plain, char *error_text, int error_size"
+    },
+    "send_heartbeat": {
+      "signature": "static int send_heartbeat(SOCKET socket_value, SecureSession *session, char *server_body, char *error_text, int error_size);",
+      "params": "SOCKET socket_value, SecureSession *session, char *server_body, char *error_text, int error_size"
+    },
+    "send_logout": {
+      "signature": "static int send_logout(SOCKET socket_value, SecureSession *session, char *error_text, int error_size);",
+      "params": "SOCKET socket_value, SecureSession *session, char *error_text, int error_size"
+    },
+    "run_client": {
+      "signature": "int run_client(const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size);",
+      "params": "const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size"
+    },
+    "add_log": {
+      "signature": "static void add_log(char *log_text, int log_size, const char *format, ...);",
+      "params": "char *log_text, int log_size, const char *format, ..."
+    }
+  },
+  "client/client_logic.h": {
+    "run_client": {
+      "signature": "int run_client(const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size);",
+      "params": "const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size"
+    },
+    "request_client_stop": {
+      "signature": "void request_client_stop(void);",
+      "params": "void"
+    },
+    "ClientProgressCallback": {
+      "signature": "typedef void (*ClientProgressCallback)(int progress_code, const char *detail);",
+      "params": "int progress_code, const char *detail",
+      "kind": "callback"
+    }
+  },
+  "client/credentials.c": {
+    "read_value": {
+      "signature": "static int read_value(FILE *file, const char *name, char *value, int value_size);",
+      "params": "FILE *file, const char *name, char *value, int value_size"
+    },
+    "executable_directory": {
+      "signature": "static int executable_directory(char *directory, int directory_size, char *executable, int executable_size);",
+      "params": "char *directory, int directory_size, char *executable, int executable_size"
+    },
+    "load_node_credential": {
+      "signature": "int load_node_credential(const char *node_id, NodeCredential *credential, char *error_text, int error_size);",
+      "params": "const char *node_id, NodeCredential *credential, char *error_text, int error_size"
+    },
+    "current_executable_hash": {
+      "signature": "int current_executable_hash(char output_hex[65], char *error_text, int error_size);",
+      "params": "char output_hex[65], char *error_text, int error_size"
+    },
+    "clear_node_credential": {
+      "signature": "void clear_node_credential(NodeCredential *credential);",
+      "params": "NodeCredential *credential"
+    }
+  },
+  "client/credentials.h": {
+    "load_node_credential": {
+      "signature": "int load_node_credential(const char *node_id, NodeCredential *credential, char *error_text, int error_size);",
+      "params": "const char *node_id, NodeCredential *credential, char *error_text, int error_size"
+    },
+    "current_executable_hash": {
+      "signature": "int current_executable_hash(char output_hex[65], char *error_text, int error_size);",
+      "params": "char output_hex[65], char *error_text, int error_size"
+    },
+    "clear_node_credential": {
+      "signature": "void clear_node_credential(NodeCredential *credential);",
+      "params": "NodeCredential *credential"
+    }
+  },
+  "client/merkle.c": {
+    "build_merkle_root": {
+      "signature": "static int build_merkle_root(long step_sums[STEP_COUNT], char merkle_root[65]);",
+      "params": "long step_sums[STEP_COUNT], char merkle_root[65]"
+    },
+    "create_result_proof": {
+      "signature": "int create_result_proof(const char *operation, long range_start, long range_end, int simulate_wrong_result, long *result, char *proof_steps, int proof_size, char merkle_root[65]);",
+      "params": "const char *operation, long range_start, long range_end, int simulate_wrong_result, long *result, char *proof_steps, int proof_size, char merkle_root[65]"
+    }
+  },
+  "client/merkle.h": {
+    "create_result_proof": {
+      "signature": "int create_result_proof(const char *operation, long range_start, long range_end, int simulate_wrong_result, long *result, char *proof_steps, int proof_size, char merkle_root[65]);",
+      "params": "const char *operation, long range_start, long range_end, int simulate_wrong_result, long *result, char *proof_steps, int proof_size, char merkle_root[65]"
+    }
+  },
+  "client/network.c": {
+    "network_start": {
+      "signature": "int network_start(char *error_text, int error_size);",
+      "params": "char *error_text, int error_size"
+    },
+    "network_connect": {
+      "signature": "SOCKET network_connect(const char *server_ip, int server_port, char *error_text, int error_size);",
+      "params": "const char *server_ip, int server_port, char *error_text, int error_size"
+    },
+    "network_send_all": {
+      "signature": "int network_send_all(SOCKET server_socket, const char *message, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, const char *message, char *error_text, int error_size"
+    },
+    "network_receive_line": {
+      "signature": "int network_receive_line(SOCKET server_socket, char *line, int line_size, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, char *line, int line_size, char *error_text, int error_size"
+    },
+    "network_close": {
+      "signature": "void network_close(SOCKET server_socket);",
+      "params": "SOCKET server_socket"
+    }
+  },
+  "client/network.h": {
+    "network_start": {
+      "signature": "int network_start(char *error_text, int error_size);",
+      "params": "char *error_text, int error_size"
+    },
+    "network_connect": {
+      "signature": "SOCKET network_connect(const char *server_ip, int server_port, char *error_text, int error_size);",
+      "params": "const char *server_ip, int server_port, char *error_text, int error_size"
+    },
+    "network_connect_retry": {
+      "signature": "SOCKET network_connect_retry(const char *server_ip, int server_port, int attempts, char *error_text, int error_size);",
+      "params": "const char *server_ip, int server_port, int attempts, char *error_text, int error_size"
+    },
+    "network_send_bytes": {
+      "signature": "int network_send_bytes(SOCKET server_socket, const char *message, int message_length, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, const char *message, int message_length, char *error_text, int error_size"
+    },
+    "network_send_all": {
+      "signature": "int network_send_all(SOCKET server_socket, const char *message, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, const char *message, char *error_text, int error_size"
+    },
+    "network_receive_line": {
+      "signature": "int network_receive_line(SOCKET server_socket, char *line, int line_size, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, char *line, int line_size, char *error_text, int error_size"
+    },
+    "network_receive_exact": {
+      "signature": "int network_receive_exact(SOCKET server_socket, char *data, int data_size, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, char *data, int data_size, char *error_text, int error_size"
+    },
+    "network_close": {
+      "signature": "void network_close(SOCKET server_socket);",
+      "params": "SOCKET server_socket"
+    }
+  },
+  "client/operations.c": {
+    "is_operation_supported": {
+      "signature": "int is_operation_supported(const char *operation);",
+      "params": "const char *operation"
+    },
+    "calculate_operation": {
+      "signature": "long calculate_operation(const char *operation, long start, long end);",
+      "params": "const char *operation, long start, long end"
+    },
+    "merge_step_values": {
+      "signature": "long merge_step_values(const char *operation, long values[4]);",
+      "params": "const char *operation, long values[4]"
+    },
+    "change_step_for_wrong_test": {
+      "signature": "void change_step_for_wrong_test(const char *operation, long values[4]);",
+      "params": "const char *operation, long values[4]"
+    }
+  },
+  "client/operations.h": {
+    "is_operation_supported": {
+      "signature": "int is_operation_supported(const char *operation);",
+      "params": "const char *operation"
+    },
+    "calculate_operation": {
+      "signature": "long calculate_operation(const char *operation, long start, long end);",
+      "params": "const char *operation, long start, long end"
+    },
+    "merge_step_values": {
+      "signature": "long merge_step_values(const char *operation, long values[4]);",
+      "params": "const char *operation, long values[4]"
+    },
+    "change_step_for_wrong_test": {
+      "signature": "void change_step_for_wrong_test(const char *operation, long values[4]);",
+      "params": "const char *operation, long values[4]"
+    }
+  },
+  "client/protocol.c": {
+    "protocol_send_frame": {
+      "signature": "int protocol_send_frame(SOCKET server_socket, const char *message_type, int status, const char *json_body, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, const char *message_type, int status, const char *json_body, char *error_text, int error_size"
+    },
+    "protocol_receive_frame": {
+      "signature": "int protocol_receive_frame(SOCKET server_socket, char *message_type, int type_size, int *status, char *json_body, int body_size, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, char *message_type, int type_size, int *status, char *json_body, int body_size, char *error_text, int error_size"
+    },
+    "json_get_string": {
+      "signature": "int json_get_string(const char *json, const char *name, char *value, int value_size);",
+      "params": "const char *json, const char *name, char *value, int value_size"
+    },
+    "json_get_long": {
+      "signature": "int json_get_long(const char *json, const char *name, long *value);",
+      "params": "const char *json, const char *name, long *value"
+    }
+  },
+  "client/protocol.h": {
+    "protocol_send_frame": {
+      "signature": "int protocol_send_frame(SOCKET server_socket, const char *message_type, int status, const char *json_body, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, const char *message_type, int status, const char *json_body, char *error_text, int error_size"
+    },
+    "protocol_receive_frame": {
+      "signature": "int protocol_receive_frame(SOCKET server_socket, char *message_type, int type_size, int *status, char *json_body, int body_size, char *error_text, int error_size);",
+      "params": "SOCKET server_socket, char *message_type, int type_size, int *status, char *json_body, int body_size, char *error_text, int error_size"
+    },
+    "json_get_string": {
+      "signature": "int json_get_string(const char *json, const char *name, char *value, int value_size);",
+      "params": "const char *json, const char *name, char *value, int value_size"
+    },
+    "json_get_long": {
+      "signature": "int json_get_long(const char *json, const char *name, long *value);",
+      "params": "const char *json, const char *name, long *value"
+    }
+  },
+  "client/secure_channel.c": {
+    "write_u64_big_endian": {
+      "signature": "static void write_u64_big_endian(unsigned char output[8], uint64_t value);",
+      "params": "unsigned char output[8], uint64_t value"
+    },
+    "make_keystream": {
+      "signature": "static int make_keystream(const unsigned char key[32], const char *direction, const char *session_id, long sequence, const unsigned char nonce[16], unsigned char *output, int output_size);",
+      "params": "const unsigned char key[32], const char *direction, const char *session_id, long sequence, const unsigned char nonce[16], unsigned char *output, int output_size"
+    },
+    "derive_session_key": {
+      "signature": "int derive_session_key(const unsigned char auth_key[32], const char *client_nonce, const char *server_nonce, const char *session_id, unsigned char output[32]);",
+      "params": "const unsigned char auth_key[32], const char *client_nonce, const char *server_nonce, const char *session_id, unsigned char output[32]"
+    },
+    "crypt_message": {
+      "signature": "static int crypt_message(const unsigned char key[32], const char *direction, const char *session_id, long sequence, const unsigned char nonce[16], const unsigned char *input, int input_size, unsigned char *output);",
+      "params": "const unsigned char key[32], const char *direction, const char *session_id, long sequence, const unsigned char nonce[16], const unsigned char *input, int input_size, unsigned char *output"
+    },
+    "protect_client_message": {
+      "signature": "int protect_client_message(SecureSession *session, const char *plain_json, char *envelope, int envelope_size);",
+      "params": "SecureSession *session, const char *plain_json, char *envelope, int envelope_size"
+    },
+    "open_server_message": {
+      "signature": "int open_server_message(SecureSession *session, const char *envelope, char *plain_json, int plain_size);",
+      "params": "SecureSession *session, const char *envelope, char *plain_json, int plain_size"
+    },
+    "clear_secure_session": {
+      "signature": "void clear_secure_session(SecureSession *session);",
+      "params": "SecureSession *session"
+    }
+  },
+  "client/secure_channel.h": {
+    "derive_session_key": {
+      "signature": "int derive_session_key(const unsigned char auth_key[32], const char *client_nonce, const char *server_nonce, const char *session_id, unsigned char output[32]);",
+      "params": "const unsigned char auth_key[32], const char *client_nonce, const char *server_nonce, const char *session_id, unsigned char output[32]"
+    },
+    "protect_client_message": {
+      "signature": "int protect_client_message(SecureSession *session, const char *plain_json, char *envelope, int envelope_size);",
+      "params": "SecureSession *session, const char *plain_json, char *envelope, int envelope_size"
+    },
+    "open_server_message": {
+      "signature": "int open_server_message(SecureSession *session, const char *envelope, char *plain_json, int plain_size);",
+      "params": "SecureSession *session, const char *envelope, char *plain_json, int plain_size"
+    },
+    "clear_secure_session": {
+      "signature": "void clear_secure_session(SecureSession *session);",
+      "params": "SecureSession *session"
+    }
+  },
+  "client/security.c": {
+    "sha256_hex": {
+      "signature": "int sha256_hex(const char *message, char output_hex[65]);",
+      "params": "const char *message, char output_hex[65]"
+    },
+    "sha256_file_hex": {
+      "signature": "int sha256_file_hex(const char *path, char output_hex[65]);",
+      "params": "const char *path, char output_hex[65]"
+    },
+    "hmac_sha256": {
+      "signature": "int hmac_sha256(const unsigned char *key, int key_size, const unsigned char *data, int data_size, unsigned char output[32]);",
+      "params": "const unsigned char *key, int key_size, const unsigned char *data, int data_size, unsigned char output[32]"
+    },
+    "hmac_sha256_hex": {
+      "signature": "int hmac_sha256_hex(const unsigned char *key, int key_size, const char *text, char output_hex[65]);",
+      "params": "const unsigned char *key, int key_size, const char *text, char output_hex[65]"
+    },
+    "secure_random": {
+      "signature": "int secure_random(unsigned char *output, int output_size);",
+      "params": "unsigned char *output, int output_size"
+    },
+    "bytes_to_hex": {
+      "signature": "void bytes_to_hex(const unsigned char *bytes, int byte_count, char *hex);",
+      "params": "const unsigned char *bytes, int byte_count, char *hex"
+    },
+    "hex_to_bytes": {
+      "signature": "int hex_to_bytes(const char *hex, unsigned char *bytes, int byte_count);",
+      "params": "const char *hex, unsigned char *bytes, int byte_count"
+    },
+    "constant_time_equal": {
+      "signature": "int constant_time_equal(const char *left, const char *right);",
+      "params": "const char *left, const char *right"
+    },
+    "clear_sensitive": {
+      "signature": "void clear_sensitive(void *data, int size);",
+      "params": "void *data, int size"
+    }
+  },
+  "client/security.h": {
+    "sha256_hex": {
+      "signature": "int sha256_hex(const char *message, char output_hex[65]);",
+      "params": "const char *message, char output_hex[65]"
+    },
+    "sha256_file_hex": {
+      "signature": "int sha256_file_hex(const char *path, char output_hex[65]);",
+      "params": "const char *path, char output_hex[65]"
+    },
+    "hmac_sha256": {
+      "signature": "int hmac_sha256(const unsigned char *key, int key_size, const unsigned char *data, int data_size, unsigned char output[32]);",
+      "params": "const unsigned char *key, int key_size, const unsigned char *data, int data_size, unsigned char output[32]"
+    },
+    "hmac_sha256_hex": {
+      "signature": "int hmac_sha256_hex(const unsigned char *key, int key_size, const char *text, char output_hex[65]);",
+      "params": "const unsigned char *key, int key_size, const char *text, char output_hex[65]"
+    },
+    "secure_random": {
+      "signature": "int secure_random(unsigned char *output, int output_size);",
+      "params": "unsigned char *output, int output_size"
+    },
+    "bytes_to_hex": {
+      "signature": "void bytes_to_hex(const unsigned char *bytes, int byte_count, char *hex);",
+      "params": "const unsigned char *bytes, int byte_count, char *hex"
+    },
+    "hex_to_bytes": {
+      "signature": "int hex_to_bytes(const char *hex, unsigned char *bytes, int byte_count);",
+      "params": "const char *hex, unsigned char *bytes, int byte_count"
+    },
+    "constant_time_equal": {
+      "signature": "int constant_time_equal(const char *left, const char *right);",
+      "params": "const char *left, const char *right"
+    },
+    "clear_sensitive": {
+      "signature": "void clear_sensitive(void *data, int size);",
+      "params": "void *data, int size"
+    }
+  },
+  "client/signature.c": {
+    "read_public_key": {
+      "signature": "static int read_public_key(char *modulus_hex, int modulus_size, unsigned long *public_exponent);",
+      "params": "char *modulus_hex, int modulus_size, unsigned long *public_exponent"
+    },
+    "exponent_bytes": {
+      "signature": "static int exponent_bytes(unsigned long exponent, unsigned char output[8]);",
+      "params": "unsigned long exponent, unsigned char output[8]"
+    },
+    "verify_task_signature": {
+      "signature": "int verify_task_signature(const char *task_text, const char *signature_hex);",
+      "params": "const char *task_text, const char *signature_hex"
+    }
+  },
+  "client/signature.h": {
+    "verify_task_signature": {
+      "signature": "int verify_task_signature(const char *task_text, const char *signature_hex);",
+      "params": "const char *task_text, const char *signature_hex"
+    }
+  }
+}

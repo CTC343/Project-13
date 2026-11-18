@@ -85,6 +85,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous_instance,
     ShowWindow(window, show_command);
     UpdateWindow(window);
 
+    /* Win32 消息循环负责响应界面输入和后台线程发来的进度通知。 */
     while (GetMessageA(&message, NULL, 0, 0) > 0) {
         TranslateMessage(&message);
         DispatchMessageA(&message);
@@ -117,6 +118,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message,
         return 0;
 
     case WM_CLIENT_PROGRESS:
+        /* 后台工作线程通过自定义消息报告进度，由 UI 线程更新控件。 */
         SetWindowTextA(log_edit, worker_log);
         switch ((int)w_param) {
         case CLIENT_PROGRESS_CONNECTING:
@@ -325,6 +327,7 @@ static void run_selected_mode(void)
     SetWindowTextA(log_edit, "");
     UpdateWindow(GetParent(run_button));
 
+    /* 网络流程放到工作线程运行，避免连接和等待任务阻塞窗口消息循环。 */
     worker = CreateThread(NULL, 0, client_worker, NULL, 0, NULL);
     if (worker == NULL) {
         SetWindowTextA(status_text, "Status: cannot start worker thread");
@@ -340,6 +343,7 @@ static void run_selected_mode(void)
 static DWORD WINAPI client_worker(LPVOID parameter)
 {
     (void)parameter;
+    /* 断线后自动重连；用户主动断开或任务验签失败时停止重试。 */
     do {
         worker_exit_code = run_client(
             worker_node, worker_mode, 1, client_progress,
@@ -359,6 +363,7 @@ static DWORD WINAPI client_worker(LPVOID parameter)
 
 static void client_progress(int progress_code, const char *detail)
 {
+    /* SendMessage 同步等待 UI 线程处理，detail 指针在调用期间保持有效。 */
     SendMessageA(main_window, WM_CLIENT_PROGRESS,
                  (WPARAM)progress_code, (LPARAM)detail);
 }

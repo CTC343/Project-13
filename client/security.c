@@ -25,6 +25,7 @@ int sha256_hex(const char *message, char output_hex[65])
         return 0;
     }
 
+    /* 通过 Windows CNG 创建 SHA-256 提供者和哈希对象，避免自写摘要算法。 */
     status = BCryptOpenAlgorithmProvider(
         &algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0
     );
@@ -98,6 +99,7 @@ int sha256_file_hex(const char *path, char output_hex[65])
     if (input == NULL) {
         return 0;
     }
+    /* 分块读取大文件并持续更新同一个哈希对象，不必将整个文件载入内存。 */
     status = BCryptOpenAlgorithmProvider(
         &algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0
     );
@@ -149,6 +151,7 @@ int hmac_sha256(const unsigned char *key, int key_size,
     NTSTATUS status;
     int success = 0;
 
+    /* CNG 的 HMAC 标志令哈希对象使用给定密钥计算 HMAC-SHA-256。 */
     status = BCryptOpenAlgorithmProvider(
         &algorithm, BCRYPT_SHA256_ALGORITHM, NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
@@ -196,6 +199,7 @@ int hmac_sha256_hex(const unsigned char *key, int key_size,
 
 int secure_random(unsigned char *output, int output_size)
 {
+    /* 使用系统首选随机数生成器，供 nonce 和认证挑战使用。 */
     return BCRYPT_SUCCESS(BCryptGenRandom(
         NULL, output, (ULONG)output_size, BCRYPT_USE_SYSTEM_PREFERRED_RNG
     ));
@@ -231,6 +235,8 @@ int constant_time_equal(const char *left, const char *right)
     size_t index;
     unsigned char difference = (unsigned char)(left_size ^ right_size);
     size_t compare_size = left_size < right_size ? left_size : right_size;
+
+    /* 不因首个不同字节提前退出，减少比较认证标签时的时序信息泄漏。 */
     for (index = 0; index < compare_size; index++) {
         difference |= (unsigned char)(left[index] ^ right[index]);
     }
@@ -239,5 +245,6 @@ int constant_time_equal(const char *left, const char *right)
 
 void clear_sensitive(void *data, int size)
 {
+    /* 使用系统安全清零接口，避免敏感内容被普通优化删除。 */
     if (data != NULL && size > 0) SecureZeroMemory(data, (SIZE_T)size);
 }

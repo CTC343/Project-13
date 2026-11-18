@@ -21,6 +21,8 @@ typedef void (*ClientProgressCallback)(int progress_code, const char *detail);
 /*
  * 执行一次完整客户端流程。
  * mode 可使用 normal、wrong 或 tamper。
+ * keep_online 非零时完成任务后继续心跳并等待后续任务。
+ * progress_callback 用于向图形界面报告连接、验证和计算状态。
  * 返回 0 表示成功，1 表示通信失败，2 表示任务认证失败。
  */
 int run_client(const char *node_id, const char *mode, int keep_online, ClientProgressCallback progress_callback, char *log_text, int log_size);

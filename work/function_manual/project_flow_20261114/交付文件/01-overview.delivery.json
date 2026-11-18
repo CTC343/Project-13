@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "f5ecfa87-8650-4964-94ff-f67ea8ea396c",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "F:\\project13\\work\\function_manual\\project_flow_20261114\\01-overview.json",
+  "output": "F:\\project13\\work\\function_manual\\project_flow_20261114\\交付文件\\01-overview.html",
+  "specification": {
+    "sha256": "120d4098de4e40c6a958a03be4cfc85e1e8ad8f263f3185786430be1e273efce",
+    "bytes": 13122
+  },
+  "artifact": {
+    "sha256": "ba1ac4f478998a294caf27236e19579e16698bf1e3cb886d1f2c56d6917e5015",
+    "bytes": 844258
+  }
+}

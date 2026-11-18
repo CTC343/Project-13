@@ -32,7 +32,7 @@ SOCKET network_connect(const char *server_ip, int server_port, char *error_text,
         return INVALID_SOCKET;
     }
 
-    //发送和接收超时设置
+    /* 限制阻塞收发等待时间，避免网络无响应时客户端永久卡住。 */
     setsockopt(server_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
     setsockopt(server_socket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout));
 
@@ -79,7 +79,7 @@ int network_receive_line(SOCKET server_socket, char *line, int line_size, char *
     while (received_length < line_size - 1) {
         int received_now;
         char *newline;
-        // 接收数据直到遇到换行符或缓冲区满
+        /* 读到 Header 分隔符就停止，避免把后续 Body 当作 Header 解析。 */
         received_now = recv(server_socket, line + received_length, line_size - 1 - received_length, 0);
 
         if (received_now == SOCKET_ERROR) {

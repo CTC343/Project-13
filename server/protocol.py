@@ -6,6 +6,7 @@ from config import MAX_BODY, MAX_HEADER, PROTOCOL_VERSION
 
 
 STATUS_OK = 200
+# 状态码沿用常见 HTTP 语义，便于区分格式、身份、冲突及结果错误。
 STATUS_BAD_REQUEST = 400
 STATUS_UNAUTHORIZED = 401
 STATUS_FORBIDDEN = 403
@@ -24,6 +25,7 @@ class ProtocolError(Exception):
 def _receive_until_newline(client_socket):
     # Header 以换行符结束；逐字节读取，避免提前读走后续 Body 数据。
     data = bytearray()
+    # 多读一个字节用于区分“恰好达到上限但还没结束”和超长 Header。
     while len(data) <= MAX_HEADER:
         chunk = client_socket.recv(1)
         if not chunk:
@@ -64,6 +66,7 @@ def receive_frame(client_socket):
     if not message_type.replace("_", "").isalnum():
         raise ProtocolError("invalid message type")
     # Body 长度必须合理，避免读取空内容或超出协议上限。
+    # 最小 JSON 对象 "{}" 占 2 个 ASCII 字节；同时限制最大帧大小。
     if body_length < 2 or body_length > MAX_BODY:
         raise ProtocolError("invalid body length", STATUS_TOO_LARGE)
 
@@ -83,6 +86,7 @@ def send_frame(client_socket, message_type, status, body):
     body_bytes = json.dumps(
         body, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
+    # 收发两端使用同一个 8 KiB 上限，避免单向发送出对方无法接收的帧。
     if len(body_bytes) > MAX_BODY:
         raise ProtocolError("response body is too large", STATUS_TOO_LARGE)
     # Header 格式：版本 消息类型 状态码 Body字节数\n，之后紧跟 JSON Body。

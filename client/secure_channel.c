@@ -31,6 +31,7 @@ static int make_keystream(const unsigned char key[32], const char *direction,
     unsigned int counter = 0;
     int copy_size;
 
+    /* 把方向、会话、序号和 nonce 纳入输入，区分会话及两个传输方向。 */
     prefix_size = snprintf((char *)input, sizeof(input), "%s|%s|",
                            direction, session_id);
     write_u64_big_endian(sequence_bytes, (uint64_t)sequence);
@@ -39,6 +40,7 @@ static int make_keystream(const unsigned char key[32], const char *direction,
     memcpy(input + prefix_size, nonce, 16);
     prefix_size += 16;
 
+    /* 每次 HMAC 生成 32 字节密钥流块，以计数器扩展到明文所需长度。 */
     while (offset < output_size) {
         counter_bytes[0] = (unsigned char)(counter >> 24);
         counter_bytes[1] = (unsigned char)(counter >> 16);
@@ -62,6 +64,7 @@ int derive_session_key(const unsigned char auth_key[32],
                        const char *session_id, unsigned char output[32])
 {
     char material[256];
+    /* 两端随机数和会话 ID 共同绑定本次连接，避免直接复用长期认证密钥。 */
     snprintf(material, sizeof(material), "SESSION|%s|%s|%s",
              client_nonce, server_nonce, session_id);
     return hmac_sha256(auth_key, 32, (unsigned char *)material,
@@ -82,6 +85,7 @@ static int crypt_message(const unsigned char key[32], const char *direction,
         free(stream);
         return 0;
     }
+    /* 加密和解密均为 XOR 同一密钥流；解密方可复用该函数。 */
     for (index = 0; index < input_size; index++) output[index] = input[index] ^ stream[index];
     clear_sensitive(stream, input_size);
     free(stream);
@@ -112,6 +116,7 @@ int protect_client_message(SecureSession *session, const char *plain_json,
         free(ciphertext); free(ciphertext_hex); free(tag_text);
         return 0;
     }
+    /* 对密文及会话元数据做 HMAC，接收方先验标签再解密。 */
     bytes_to_hex(nonce, sizeof(nonce), nonce_hex);
     bytes_to_hex(ciphertext, plain_size, ciphertext_hex);
     snprintf(tag_text, plain_size * 2 + 256, "C2S|%s|%ld|%s|%s",
@@ -156,6 +161,7 @@ int open_server_message(SecureSession *session, const char *envelope,
         sequence != session->receive_sequence + 1 ||
         !hex_to_bytes(nonce_hex, nonce, 16) || strlen(ciphertext_hex) % 2 != 0) return 0;
 
+    /* 严格要求下一条序号，阻止旧帧重放和乱序帧进入解密流程。 */
     ciphertext_size = (int)strlen(ciphertext_hex) / 2;
     if (ciphertext_size < 2 || ciphertext_size + 1 > plain_size) return 0;
     ciphertext = malloc(ciphertext_size > 0 ? ciphertext_size : 1);
@@ -166,6 +172,7 @@ int open_server_message(SecureSession *session, const char *envelope,
              session->session_id, sequence, nonce_hex, ciphertext_hex);
     if (!hmac_sha256_hex(session->key, 32, tag_text, expected_tag) ||
         !constant_time_equal(received_tag, expected_tag)) goto cleanup;
+    /* 只有认证标签验证成功后才解密，并在成功时推进接收序号。 */
     if (!crypt_message(session->key, "S2C", session->session_id, sequence,
                        nonce, ciphertext, ciphertext_size,
                        (unsigned char *)plain_json)) goto cleanup;

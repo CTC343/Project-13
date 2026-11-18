@@ -73,9 +73,7 @@ static int receive_secure_any(SOCKET socket_value, SecureSession *session,
     return 1;
 }
 
-static int receive_secure(SOCKET socket_value, SecureSession *session,
-                          const char *expected_action, char *plain,
-                          char *error_text, int error_size)
+static int receive_secure(SOCKET socket_value, SecureSession *session,  const char *expected_action, char *plain,  char *error_text, int error_size)
 {
     char action[64];
     if (!receive_secure_any(socket_value, session, plain, action,
@@ -88,6 +86,8 @@ static int receive_secure(SOCKET socket_value, SecureSession *session,
     return 1;
 }
 
+
+//把业务 JSON 加密并附加认证标签，封装成类型 SECURE、状态 0 的协议帧发送；成功返回非零，失败返回 0。
 static int send_secure(SOCKET socket_value, SecureSession *session,
                        const char *plain, char *error_text, int error_size)
 {
@@ -96,9 +96,10 @@ static int send_secure(SOCKET socket_value, SecureSession *session,
         snprintf(error_text, error_size, "Cannot protect secure message.");
         return 0;
     }
-    return protocol_send_frame(socket_value, "SECURE", 0, envelope,
-                               error_text, error_size);
+    return protocol_send_frame(socket_value, "SECURE", 0, envelope, error_text, error_size);
 }
+
+
 
 static int send_heartbeat(SOCKET socket_value, SecureSession *session,
                           char *server_body,
@@ -119,6 +120,8 @@ static int send_logout(SOCKET socket_value, SecureSession *session,
     const char *body = "{\"action\":\"LOGOUT\"}";
     return send_secure(socket_value, session, body, error_text, error_size);
 }
+
+
 
 int run_client(const char *node_id, const char *mode, int keep_online,
                ClientProgressCallback progress_callback,
@@ -165,6 +168,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     if (log_text == NULL || log_size <= 0) return 1;
     log_text[0] = '\0';
 
+    /* 准备阶段：检查节点 ID，读取授权信息，并计算客户端程序哈希。 */
     if (!valid_node_id(node_id)) {
         add_log(log_text, log_size,
                 "Node ID may contain only letters, numbers, '-' and '_'.\r\n");
@@ -184,6 +188,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     }
     add_log(log_text, log_size, "Executable integrity: hash ready\r\n");
 
+    /* 连接阶段：启动网络并连接服务器，最多尝试 3 次。 */
     if (!network_start(network_error, sizeof(network_error))) {
         add_log(log_text, log_size, "%s\r\n", network_error);
         goto cleanup;
@@ -200,6 +205,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     }
     add_log(log_text, log_size, "Connection: connected\r\n");
 
+    /* 认证阶段：发送节点授权、程序哈希和身份签名，验证服务器身份并建立加密会话。 */
     if (!secure_random(nonce_bytes, sizeof(nonce_bytes))) {
         add_log(log_text, log_size, "Secure random generation failed.\r\n");
         goto cleanup;
@@ -229,6 +235,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         add_log(log_text, log_size, "Login: %s\r\n", network_error);
         goto cleanup;
     }
+    
     if (strcmp(message_type, "AUTH_OK") != 0 || status != 200 ||
         !json_get_string(server_body, "session_id", session.session_id,
                          sizeof(session.session_id)) ||
@@ -257,6 +264,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     report_progress(progress_callback, CLIENT_PROGRESS_AUTHENTICATED,
                     "Authentication passed");
 
+    /* 在线阶段：先发送一次心跳，确认连接可用后开始等待任务。 */
     if (!send_heartbeat(server_socket, &session, server_body,
                         network_error, sizeof(network_error))) {
         add_log(log_text, log_size, "Heartbeat: %s\r\n", network_error);
@@ -266,6 +274,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
     report_progress(progress_callback, CLIENT_PROGRESS_HEARTBEAT,
                     "Online; waiting for task");
 
+    /* 任务循环：持续接收服务器消息；收到 WAIT 就等待并定期心跳，收到 TASK 就进入任务处理。 */
     while (!stop_requested) {
         if (keep_online) return_code = 1;
         if (!receive_secure_any(server_socket, &session, server_body,
@@ -301,6 +310,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
             continue;
         }
 
+        /* 任务处理：解析任务参数，检查操作类型和范围，再验证服务器签名。 */
         if (strcmp(action, "TASK") != 0 ||
             !json_get_string(server_body, "task_id", task_id, sizeof(task_id)) ||
             !json_get_string(server_body, "operation", operation, sizeof(operation)) ||
@@ -340,6 +350,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         report_progress(progress_callback, CLIENT_PROGRESS_VERIFIED,
                         "Progress: 50% - task signature verified");
 
+        /* 计算阶段：执行任务并生成结果证明，随后向服务器提交并等待接受确认。 */
         if (!create_result_proof(operation, range_start, range_end,
                                  simulate_wrong_result, &result,
                                  proof_steps, sizeof(proof_steps), merkle_root)) {
@@ -378,6 +389,7 @@ int run_client(const char *node_id, const char *mode, int keep_online,
         );
     }
 
+    /* 退出阶段：持续在线模式在用户停止时通知服务器注销，然后统一关闭连接并清理敏感数据。 */
     if (keep_online && server_socket != INVALID_SOCKET) {
         send_logout(server_socket, &session, network_error, sizeof(network_error));
         add_log(log_text, log_size, "Connection: disconnected by user\r\n");

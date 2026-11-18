@@ -1,0 +1,425 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "结果验证、严格多数、信誉与审计",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "work/function_manual/project_flow_20261114/交付文件/04-results.html",
+    "repository": {
+      "url": "https://github.com/CTC343/Project-13.git",
+      "revision": "faddfa60ce6cc578b5b2d7025ee0bf7413e15308",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "receive",
+      "label": "服务端接收与共享状态"
+    },
+    {
+      "id": "vote",
+      "label": "表决、汇总与资格计算"
+    },
+    {
+      "id": "files",
+      "label": "业务审计与考核文件"
+    },
+    {
+      "id": "reply",
+      "label": "轮次推进与客户端回执"
+    },
+    {
+      "id": "failure",
+      "label": "结果拒绝与无多数分支",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "validate",
+      "lane": "receive",
+      "col": 0,
+      "type": "security",
+      "label": "验证 RESULT",
+      "sublabel": "身份、任务、四步值与根",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        },
+        {
+          "path": "server/merkle.py",
+          "line": 19,
+          "end_line": 30
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "store",
+      "lane": "receive",
+      "col": 1,
+      "type": "backend",
+      "label": "加锁存入本轮结果",
+      "sublabel": "拒绝重复与已过期任务",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        }
+      ]
+    },
+    {
+      "id": "count",
+      "lane": "receive",
+      "col": 2,
+      "type": "security",
+      "label": "本轮结果收齐？",
+      "sublabel": "数量等于 REQUIRED_NODES",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "majority",
+      "lane": "vote",
+      "col": 2,
+      "type": "security",
+      "label": "存在严格多数？",
+      "sublabel": "同一数值票数超过一半",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 37,
+          "end_line": 45
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "merge",
+      "lane": "vote",
+      "col": 3,
+      "type": "backend",
+      "label": "采纳并合并子任务",
+      "sublabel": "累计 trusted_results",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        },
+        {
+          "path": "server/operations.py",
+          "line": 23,
+          "end_line": 34
+        }
+      ]
+    },
+    {
+      "id": "rep",
+      "lane": "vote",
+      "col": 4,
+      "type": "security",
+      "label": "更新信誉与资格",
+      "sublabel": "正确 +5 / 错误 −15",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 48,
+          "end_line": 62
+        },
+        {
+          "path": "server/scheduler.py",
+          "line": 6,
+          "end_line": 14
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "files",
+      "col": 4,
+      "type": "database",
+      "label": "保存本轮业务审计",
+      "sublabel": "data/audit.jsonl",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        },
+        {
+          "path": "server/audit.py",
+          "line": 19,
+          "end_line": 41
+        }
+      ]
+    },
+    {
+      "id": "eval",
+      "lane": "files",
+      "col": 5,
+      "type": "database",
+      "label": "末轮生成考核报告",
+      "sublabel": "误差 / 安全开销 / 恶意比例",
+      "sources": [
+        {
+          "path": "server/evaluation.py",
+          "line": 67,
+          "end_line": 87
+        },
+        {
+          "path": "server/evaluation.py",
+          "line": 90,
+          "end_line": 93
+        }
+      ]
+    },
+    {
+      "id": "advance",
+      "lane": "reply",
+      "col": 4,
+      "type": "backend",
+      "label": "结束或推进轮次",
+      "sublabel": "末轮 completed；否则 round+1",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        },
+        {
+          "path": "server/task_state.py",
+          "line": 29,
+          "end_line": 33
+        }
+      ],
+      "icon": "decision"
+    },
+    {
+      "id": "ack",
+      "lane": "reply",
+      "col": 5,
+      "type": "messagebus",
+      "label": "返回 ACCEPTED",
+      "sublabel": "已接收，不保证赢得多数",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        }
+      ],
+      "icon": "success"
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 0,
+      "type": "security",
+      "label": "拒绝本次提交",
+      "sublabel": "403 / 409 / 422 等",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 171,
+          "end_line": 213
+        },
+        {
+          "path": "server/task_service.py",
+          "line": 216,
+          "end_line": 364
+        }
+      ],
+      "icon": "failure"
+    },
+    {
+      "id": "nomajor",
+      "lane": "failure",
+      "col": 2,
+      "type": "security",
+      "label": "没有严格多数",
+      "sublabel": "不采纳结果，不更新信誉",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        }
+      ],
+      "icon": "failure"
+    },
+    {
+      "id": "nullaudit",
+      "lane": "failure",
+      "col": 3,
+      "type": "database",
+      "label": "保存失败审计",
+      "sublabel": "可信值 null；随后返回 False",
+      "sources": [
+        {
+          "path": "server/task_service.py",
+          "line": 65,
+          "end_line": 124
+        },
+        {
+          "path": "server/audit.py",
+          "line": 19,
+          "end_line": 41
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "validate--store",
+      "from": "validate",
+      "to": "store",
+      "variant": "security",
+      "label": "通过"
+    },
+    {
+      "id": "validate--reject",
+      "from": "validate",
+      "to": "reject",
+      "variant": "security",
+      "label": "失败",
+      "role": "error"
+    },
+    {
+      "id": "store--count",
+      "from": "store",
+      "to": "count",
+      "variant": "default"
+    },
+    {
+      "id": "count--majority",
+      "from": "count",
+      "to": "majority",
+      "variant": "default",
+      "label": "收齐"
+    },
+    {
+      "id": "count--ack",
+      "from": "count",
+      "to": "ack",
+      "variant": "default",
+      "label": "未收齐"
+    },
+    {
+      "id": "majority--merge",
+      "from": "majority",
+      "to": "merge",
+      "variant": "default",
+      "label": "有多数"
+    },
+    {
+      "id": "merge--rep",
+      "from": "merge",
+      "to": "rep",
+      "variant": "default"
+    },
+    {
+      "id": "rep--audit",
+      "from": "rep",
+      "to": "audit",
+      "variant": "default",
+      "label": "非末轮"
+    },
+    {
+      "id": "audit--advance",
+      "from": "audit",
+      "to": "advance",
+      "variant": "default"
+    },
+    {
+      "id": "advance--ack",
+      "from": "advance",
+      "to": "ack",
+      "variant": "default"
+    },
+    {
+      "id": "majority--nomajor",
+      "from": "majority",
+      "to": "nomajor",
+      "variant": "security",
+      "label": "无多数",
+      "role": "error"
+    },
+    {
+      "id": "nomajor--nullaudit",
+      "from": "nomajor",
+      "to": "nullaudit",
+      "variant": "default"
+    },
+    {
+      "id": "nullaudit--advance",
+      "from": "nullaudit",
+      "to": "advance",
+      "variant": "dashed",
+      "label": "当前仍推进"
+    },
+    {
+      "id": "rep--eval",
+      "from": "rep",
+      "to": "eval",
+      "label": "末轮",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "eval--audit",
+      "from": "eval",
+      "to": "audit",
+      "label": "考核后审计",
+      "variant": "default",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "信誉规则与最终输出",
+      "items": [
+        "初始信誉为 60，正确奖励 5，错误扣 15，限制在 0～100；累计第 5 次错误标记恶意，正确轮次不会清零错误计数。",
+        "重要任务资格要求信誉至少 60 且不在恶意集合；当前只是计算名单，没有接入领取拦截。",
+        "业务审计保存结果、证明、表决、合并值、信誉和异常节点；最后一轮成功表决时写 evaluation.json。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "失败和回执的实际含义",
+      "items": [
+        "无多数只记失败审计；调用方没有检查 finish_task 的 False，仍可能推进下一轮或标记完成，没有自动重投机制。",
+        "ACCEPTED 只确认此节点结果被接收。RESULT_ACCEPTED 另外写安全日志；其他节点不必等本轮表决结束才收到回执。",
+        "考核安全开销来自 Python 固定微基准，不是整个 C/S 流程的端到端性能。信誉、轮次与结果集合保存在内存，重启会重建。",
+        "最终汇总答案输出到服务端日志和控制中心；当前没有向所有客户端广播最终总答案的单独协议消息。"
+      ]
+    }
+  ],
+  "mainPath": [
+    "validate",
+    "store",
+    "count",
+    "majority",
+    "merge",
+    "rep",
+    "audit",
+    "advance",
+    "ack"
+  ]
+}

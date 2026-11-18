@@ -9,10 +9,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PRIVATE_KEY_FILE = PROJECT_ROOT / "data" / "task_private_key.json"
 PUBLIC_KEY_FILE = PROJECT_ROOT / "client" / "task_public.key"
+# RSA 常用公钥指数；奇数且计算高效，同时满足与 p-1、q-1 互素的条件。
 PUBLIC_EXPONENT = 65537
 
 
 def _probably_prime(number, rounds=24):
+    # Miller-Rabin 做 24 轮随机测试；轮数越多，合数误判为素数的概率越低。
     if number < 2 or number % 2 == 0:
         return number == 2
     d = number - 1
@@ -52,10 +54,12 @@ def ensure_task_signing_keys():
         except (OSError, json.JSONDecodeError):
             pass
 
+    # 两个 1024 位素数相乘得到 2048 位 RSA 模数，与客户端验签长度约定一致。
     first_prime = _generate_prime(1024)
     second_prime = _generate_prime(1024)
     while (
         second_prime == first_prime
+        # 若最高位组合使乘积少于 2048 位，则重新生成第二个素数。
         or (first_prime * second_prime).bit_length() != 2048
     ):
         second_prime = _generate_prime(1024)

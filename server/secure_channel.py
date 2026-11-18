@@ -18,6 +18,7 @@ def derive_session_key(auth_key, client_nonce, server_nonce, session_id):
 def _keystream(key, direction, session_id, sequence, nonce, size):
     output = bytearray()
     counter = 0
+    # 8 字节序号和 16 字节 nonce 一并参与 HMAC，绑定本消息且避免密钥流复用。
     prefix = (
         direction.encode("ascii")
         + b"|"
@@ -28,6 +29,7 @@ def _keystream(key, direction, session_id, sequence, nonce, size):
     )
 
     while len(output) < size:
+        # SHA-256 每次输出 32 字节；4 字节计数器区分同一消息内的密钥流块。
         block = hmac.new(
             key, prefix + counter.to_bytes(4, "big"), hashlib.sha256
         ).digest()
@@ -41,6 +43,7 @@ def encrypt_message(key, direction, session_id, sequence, payload):
     plaintext = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
+    # 每帧使用 16 字节（128 位）随机 nonce，改变对应的密钥流输入。
     nonce = secrets.token_bytes(16)
     stream = _keystream(
         key, direction, session_id, sequence, nonce, len(plaintext)
@@ -77,6 +80,7 @@ def decrypt_message(key, direction, expected_session, expected_sequence, envelop
         raise ValueError("session id does not match")
     if sequence != expected_sequence:
         raise ValueError("message sequence is replayed or out of order")
+    # nonce 长度固定为 16 字节，与加密端生成长度一致。
     if len(nonce) != 16:
         raise ValueError("invalid message nonce")
 

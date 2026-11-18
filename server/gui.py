@@ -17,21 +17,16 @@ from config import (
     DATA_DIR,
     HOST,
     INITIAL_REPUTATION,
-    MALICIOUS_WRONG_ROUNDS,
     PORT,
-    REQUIRED_NODES,
-    TASK_END,
     TASK_ID_PREFIX,
-    TASK_START,
-    TOTAL_ROUNDS,
 )
 from evaluation import read_evaluation_report
-from operations import OPERATION_OPTIONS, operation_label
+from operations import operation_label
 from process_manager import ProcessManager
 from runtime_log import matches, recent_logs
 from security_audit import read_security_events, record_security_event
 from security_tests import create_report, read_security_test_report
-from task_state import validate_settings
+from task_form import TaskForm
 
 
 def node_is_available(login, state, persistent):
@@ -63,13 +58,10 @@ class ControlCenter:
         self.malicious_text = tk.StringVar(value="尚未发现持续异常节点")
         self.allocation_text = tk.StringVar(value="重要任务尚未调度")
         self.node_rows = {}
-        self.operation_inputs = {}
-        self.demo_buttons = []
         self.status_rows = {}
         self.available_nodes = set()
         self.connected_nodes = set()
         self.account_admin = None
-        self.task_running = False
         self.accounts = AccountStore()
         self.actor = None
         self.role = None
@@ -208,103 +200,13 @@ class ControlCenter:
             wraplength=850,
         ).pack(anchor="w", pady=(0, 12))
 
-        operation_notebook = ttk.Notebook(parent)
-        operation_notebook.pack(fill="both", expand=True)
-
-        for operation, label, description in OPERATION_OPTIONS:
-            operation_tab = ttk.Frame(operation_notebook, padding=18)
-            operation_notebook.add(operation_tab, text=label)
-            self._build_operation_form(
-                operation_tab, operation, label, description
-            )
-
-    def _build_operation_form(self, parent, operation, label, description):
-        ttk.Label(parent, text=label, style="Heading.TLabel").grid(
-            row=0, column=0, columnspan=4, sticky="w", pady=(0, 6)
-        )
-        ttk.Label(parent, text=description).grid(
-            row=1, column=0, columnspan=4, sticky="w", pady=(0, 16)
-        )
-
-        field_definitions = [
-            ("start", "起始值", TASK_START),
-            ("end", "最终值", TASK_END),
-            ("subtask_count", "子任务数", TOTAL_ROUNDS),
-            ("nodes_per_subtask", "每个子任务的节点数", REQUIRED_NODES),
-        ]
-        input_variables = {}
-
-        for index, (field_name, field_label, default_value) in enumerate(
-            field_definitions
-        ):
-            row_number = 2 + index // 2
-            column_number = (index % 2) * 2
-            ttk.Label(
-                parent, text=f"{field_label}（默认 {default_value}）"
-            ).grid(
-                row=row_number,
-                column=column_number,
-                sticky="w",
-                padx=(0, 10),
-                pady=7,
-            )
-            variable = tk.StringVar()
-            ttk.Entry(parent, textvariable=variable, width=18).grid(
-                row=row_number,
-                column=column_number + 1,
-                sticky="w",
-                padx=(0, 30),
-                pady=7,
-            )
-            input_variables[field_name] = variable
-
-        self.operation_inputs[operation] = input_variables
-        run_button = ttk.Button(
-            parent,
-            text=f"运行{label}完整流程",
-            command=lambda code=operation: self._run_operation(code),
-        )
-        run_button.grid(row=4, column=0, columnspan=2, sticky="w", pady=(18, 8))
-        self.demo_buttons.append(run_button)
-
-        ttk.Label(
-            parent,
-            text=(
-                f"节点数至少为 3；连续异常检测需要至少 "
-                f"{MALICIOUS_WRONG_ROUNDS} 个子任务。"
-            ),
-        ).grid(row=5, column=0, columnspan=4, sticky="w")
-
-    def _read_operation_settings(self, operation):
-        variables = self.operation_inputs[operation]
-        defaults = {
-            "start": TASK_START,
-            "end": TASK_END,
-            "subtask_count": TOTAL_ROUNDS,
-            "nodes_per_subtask": REQUIRED_NODES,
-        }
-        settings = {"operation": operation, "important": self.important.get()}
-
-        try:
-            for field_name, default_value in defaults.items():
-                text = variables[field_name].get().strip()
-                settings[field_name] = int(text) if text else default_value
-        except ValueError:
-            messagebox.showerror("输入错误", "所有输入项必须是整数。")
-            return None
-
-        try:
-            validate_settings(settings)
-        except ValueError as error:
-            messagebox.showerror("输入错误", str(error))
-            return None
-
-        return settings
+        self.task_form = TaskForm(parent, self.important, self._run_operation)
+        self.task_form.pack(fill="both", expand=True)
 
     def _run_operation(self, operation):
         if not self._require_role("operator"):
             return
-        settings = self._read_operation_settings(operation)
+        settings = self.task_form.read_settings(operation)
         if settings is None:
             return
 
@@ -335,9 +237,7 @@ class ControlCenter:
             messagebox.showerror("提交任务失败", str(error))
             return
         self._clear_results()
-        self.task_running = True
-        for button in self.demo_buttons:
-            button.configure(state="disabled")
+        self.task_form.set_running(True)
 
     def _build_result_tab(self, parent):
         ttk.Label(parent, textvariable=self.majority_text,
@@ -605,9 +505,7 @@ class ControlCenter:
             return
         record_security_event("CONSOLE_STOP_SERVICE", self.actor, "local")
         self.process_manager.stop_server()
-        self.task_running = False
-        for button in self.demo_buttons:
-            button.configure(state="normal")
+        self.task_form.set_running(False)
         self._clear_node_status()
 
     def _clear_node_status(self):
@@ -657,9 +555,7 @@ class ControlCenter:
         elif event_type == "server_stopped":
             if not self.process_manager.is_server_running():
                 self.status_text.set(event[1])
-                self.task_running = False
-                for button in self.demo_buttons:
-                    button.configure(state="normal")
+                self.task_form.set_running(False)
                 self._clear_node_status()
 
     def _read_server_line(self, line):
@@ -695,18 +591,12 @@ class ControlCenter:
             self.integrated_text.set(f"当前累计整合结果：{integrated_value}")
         elif line.startswith("Vote failed:"):
             self.majority_text.set("多数表决失败：没有过半数的一致结果")
-            self.task_running = False
-            for button in self.demo_buttons:
-                button.configure(state="normal")
+            self.task_form.set_running(False)
         elif line.startswith("Batch rejected:"):
             self.status_text.set(line)
-            self.task_running = False
-            for button in self.demo_buttons:
-                button.configure(state="normal")
+            self.task_form.set_running(False)
         elif line.startswith(("Batch started:", "Batch active:")):
-            self.task_running = True
-            for button in self.demo_buttons:
-                button.configure(state="disabled")
+            self.task_form.set_running(True)
         elif line.startswith("Malicious node detected:"):
             node_id = line.split(":", 1)[1].strip()
             self._set_node_value(node_id, status="持续异常")
@@ -726,10 +616,8 @@ class ControlCenter:
         elif line.startswith("Evaluation malicious ratio:"):
             self._refresh_evaluation()
         elif "All subtask rounds complete." in line:
-            self.task_running = False
+            self.task_form.set_running(False)
             self.status_text.set("任务完成，客户端继续在线等待")
-            for button in self.demo_buttons:
-                button.configure(state="normal")
             self._refresh_audit()
             self._refresh_evaluation()
             self._refresh_security()

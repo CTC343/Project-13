@@ -2,6 +2,8 @@
 
 Python 服务端协调任务，Windows C 客户端计算。普通用户运行 `client_gui.exe`，填写服务端地址、端口、账户和口令。首次登录自动登记本机，账户获准后进入在线节点池。同一份客户端可部署到多台 Windows 机器。另有 `client.exe` 作为命令行联调入口，两者使用同一个服务端和计算逻辑。
 
+[目录树](目录树.txt)列出源码文件的用途，[版本标签说明](版本标签.txt)记录各版本新增的功能。
+
 ## 本机部署
 
 服务端部署和客户端构建需要 Windows x64、64 位 Python 3.12 或以上（带 OpenSSL 3 和 Tk）、Visual Studio Build Tools 的 C++ 桌面开发组件，以及 OpenSSL 3 命令行程序。首次部署时，先按下文[编译客户端并生成服务端证书](#1-编译客户端并生成服务端证书)，再[创建登录账号](#2-创建登录账号)。若构建时找不到 Visual Studio，把环境变量 `PROJECT13_VCVARS` 设为该安装目录下的 `VC\Auxiliary\Build\vcvars64.bat`。

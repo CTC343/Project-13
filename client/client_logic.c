@@ -176,6 +176,7 @@ int run_client(ClientLogin *login, const char *mode, int keep_online,
     add_log(log_text, log_size, "Executable integrity: hash ready\r\n");
 
     report_progress(progress_callback, CLIENT_PROGRESS_CONNECTING, "Signing in over TLS");
+    /* Enrollment may create local credentials before the mutual TLS connection. */
     connection_status = device_prepare(login, executable_hash, network_error, sizeof(network_error));
     if (connection_status != 1 || !valid_node_id(node_id) || !valid_node_id(login->license_id)) {
         add_log(log_text, log_size, "Device setup: %s\r\n", network_error);
@@ -227,6 +228,7 @@ int run_client(ClientLogin *login, const char *mode, int keep_online,
         return_code = 2;
         goto cleanup;
     }
+    /* Reconcile the previous result before asking the server for a new task. */
     pending_status = outbox_load(&outbox, body, sizeof(body));
     if (pending_status < 0) {
         add_log(log_text, log_size, "Pending result requires local recovery.\r\n");
@@ -357,6 +359,7 @@ int run_client(ClientLogin *login, const char *mode, int keep_online,
             "\"node_id\":\"%s\",\"value\":%ld,"
             "\"merkle_root\":\"%s\",\"proof_steps\":\"%s\"}",
             task_id, node_id, result, merkle_root, proof_steps);
+        /* Keep the result on disk until the matching server receipt arrives. */
         if (!outbox_save(&outbox, body)) {
             add_log(log_text, log_size, "Result could not be saved locally (system code %lu).\r\n", GetLastError());
             return_code = 2;

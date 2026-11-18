@@ -1,4 +1,4 @@
-"""把总区间平均拆成五个计算子任务。"""
+"""按配置的轮数将总闭区间拆成连续、尽量等大的子区间。"""
 
 from config import TASK_END, TASK_START, TOTAL_ROUNDS
 

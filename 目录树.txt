@@ -1,0 +1,96 @@
+Project13 仓库目录树
+
+入口
+  服务端控制中心从项目根目录运行 python -B .\server\gui.py。
+  Windows 客户端从 downloads/ 下载并完整解压，再双击 client_gui.exe。
+  在源码目录运行 python -B .\build.py，可以重新构建客户端。
+
+Project13/
+├── .gitignore                              Git 忽略的本地文件和运行目录
+├── build.py                                使用 MSVC 构建两个客户端 EXE 并收集运行库
+├── release.py                              本地版本打包、完整性校验、备份、启动和回滚
+├── README.md                               部署步骤、客户端下载、账号及证书生成方法
+├── DEPLOYMENT.md                           部署检查、故障恢复、升级与回滚步骤
+├── ENVIRONMENT.md                          Windows、Python、OpenSSL 和编译环境说明
+├── PROTOCOL.md                             TLS 连接、P13/1 帧和任务消息约定
+├── SERVER_CODE_GUIDE.md                    服务端工作流程的英文说明
+├── SERVER_CODE_GUIDE.zh-CN.md              服务端工作流程的中文说明
+├── 目录树.txt                               当前文件和模块的用途
+├── 版本标签.txt                             Git 标签对应的功能变化
+├── downloads/                             面向使用者的客户端整合包
+│   └── project13-client-windows-x64.zip    Windows EXE、DLL、公开信任包和任务验签公钥
+├── server/                                Python 服务端和控制中心
+│   ├── server.py                           启动业务和登记端口，按请求用途分派连接
+│   ├── gui.py                              组织控制中心各页、登录和操作流程
+│   ├── task_form.py                        绘制运算表单，读取并校验任务参数
+│   ├── process_manager.py                  启停、守护服务进程，启动客户端并提交任务指令
+│   ├── demo.py                             旧演示入口，打开控制中心
+│   ├── config.py                           数据路径、网络地址、任务默认值和信誉门槛
+│   ├── account_admin.py                    开户、账号在线状态和预览设备选择界面
+│   ├── accounts.py                         账号和角色校验、scrypt 口令处理、设备及会话记录
+│   ├── enrollment.py                       校验首次登录并为客户端签发设备证书
+│   ├── provision.py                        初始化证书、账号库和公钥，提供轮换及吊销命令
+│   ├── credential_store.py                 维护允许连接的客户端可执行文件哈希
+│   ├── tls_transport.py                    配置 TLS 1.3，校验客户端证书和节点身份
+│   ├── protocol.py                         读取和写入 P13/1 消息帧及状态码
+│   ├── secure_channel.py                   早期演示协议实现，现行连接由 tls_transport.py 建立
+│   ├── node_registry.py                    跟踪节点上线、心跳和连接占用
+│   ├── preview.py                          协调预览请求、接收图像并共享最新帧
+│   ├── preview_window.py                   控制中心的预览窗口和图像刷新
+│   ├── task_service.py                     处理节点会话和心跳，签发任务并回应结果消息
+│   ├── scheduler.py                        按轮次预留和释放节点名额，筛选重要任务节点
+│   ├── task_planner.py                     按轮次计算互不重叠的整数子区间
+│   ├── task_results.py                     验证提交、返回持久化回执、表决和更新信誉
+│   ├── task_state.py                       校验任务配置，读写 SQLite 检查点和轮次审计
+│   ├── operations.py                       定义运算选项、预期结果和跨轮合并规则
+│   ├── merkle.py                           从提交的计算步骤验证 Merkle 证明
+│   ├── rsa_keys.py                         生成和读取任务签名密钥对
+│   ├── signature.py                        为任务编号、运算类型和区间生成签名
+│   ├── audit.py                            从任务库读取历史轮次审计
+│   ├── evaluation.py                       计算并读取任务考核指标
+│   ├── runtime_log.py                      写入、轮转和筛选运行日志
+│   ├── security_audit.py                   写入和读取登录及管理操作的安全审计
+│   └── security_tests.py                   校验 TLS、口令处理、消息帧、签名和程序哈希
+└── client/                                Windows 客户端源码
+    ├── client.c                            命令行入口、参数和隐藏口令输入
+    ├── client_gui.c                        Win32 登录窗口、任务状态和日志显示
+    ├── client_logic.c                      登录、断线重试所需状态、计算、验签和回执处理
+    ├── client_logic.h                      客户端登录、进度和运行接口声明
+    ├── credentials.c                       凭据工具及早期节点凭据读取
+    ├── credentials.h                       凭据结构及对应工具接口声明
+    ├── device.c                            本机密钥、证书申请和节点身份读写
+    ├── device.h                            设备登记接口声明
+    ├── merkle.c                            计算提交结果的四步 Merkle 证明
+    ├── merkle.h                            Merkle 证明接口声明
+    ├── network.c                           TCP 连接、TLS 握手、读写和证书验证
+    ├── network.h                           网络连接结构和 TLS 读写接口声明
+    ├── openssl_api.h                       客户端所需的 OpenSSL 类型和函数声明
+    ├── operations.c                        计算区间求和、计数、最小值和最大值
+    ├── operations.h                        客户端区间运算接口声明
+    ├── outbox.c                            加密落盘、恢复、确认和留存待发结果
+    ├── outbox.h                            本机待发结果的存储结构和接口声明
+    ├── preview.c                           经客户端授权采集应用窗口并传送 PNG 帧
+    ├── preview.h                           窗口预览控件和预览生命周期接口声明
+    ├── protocol.c                          P13/1 帧编解码和简单 JSON 字段提取
+    ├── protocol.h                          帧格式常量和协议接口声明
+    ├── secure_channel.c                    早期演示报文加密实现，现行构建使用 TLS
+    ├── secure_channel.h                    早期演示报文加密接口声明
+    ├── security.c                          安全随机数、摘要、编码和内存清零工具
+    ├── security.h                          安全工具接口声明
+    ├── signature.c                         读取公开任务公钥并检查任务签名
+    ├── signature.h                         任务验签接口声明
+    ├── watchdog.c                          监控图形客户端进程，异常退出后重启
+    └── watchdog.h                          图形客户端进程守护接口声明
+
+部署后在本机生成的目录
+  client/output/     build.py 的 EXE 和 DLL，初始化后包含公开信任包和任务验签公钥。
+  data/runtime/      服务端证书、私钥、SQLite 账号库和任务库、日志、备份。
+  releases/          release.py stage 创建的本地版本目录。
+  %LOCALAPPDATA%\Project13\  客户端本机设备证书、私钥和加密待发结果。
+
+修改入口
+  新增区间运算时，在 server/operations.py 声明标签、预期结果和合并规则，
+  并在 client/operations.c 实现同名计算，检查双方对证明和协议的约定。
+  调整重要任务的节点筛选时，修改 server/scheduler.py。
+  调整表决、结果接收或信誉更新时，修改 server/task_results.py。
+  修改任务输入和校验时，检查 server/task_form.py 和 server/task_state.py。

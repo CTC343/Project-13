@@ -28,22 +28,41 @@ python -B server/gui.py
 
 客户端电脑需要 Windows x64、能访问服务器的网络，以及维护员在「账号管理」中创建的客户端账号和口令。使用编译好的客户端，接收方无需安装 Python、Visual Studio 或 OpenSSL 命令行工具。
 
-部署者从活动发布版的 `releases/<版本>/client/` 收集以下文件。未使用发布版的部署从 `client/output/` 收集。先完成服务端初始化，用活动版本启动控制中心后再打包，以便发布目录同步部署材料。将文件保留在同一个客户端目录，按表中的相对路径存放。
+连接本项目现有服务器时，可以直接下载 [Windows x64 客户端整合包](downloads/project13-client-windows-x64.zip)，解压后双击 `client_gui.exe`。客户端 C 源码在 [`client/`](client/)，下载包单独放在 `downloads/`。
+
+部署自己的服务器时，从活动发布版的 `releases/<版本>/client/` 收集下列文件。未使用发布版的部署从 `client/output/` 收集。先初始化服务端，再启动活动版本的控制中心，以同步本次部署的信任文件和任务验签公钥。解压后保持表中的相对路径。
 
 | 文件 | 用途 |
 | --- | --- |
 | `client_gui.exe` | 双击打开客户端界面。可选的 `client.exe` 用于命令行联调。 |
 | `libssl-3.dll`、`libcrypto-3.dll` | 客户端 TLS 和加密运行库，与 EXE 同目录。 |
 | `vcruntime140.dll`、`vcruntime140_1.dll` | 随构建产物提供的 C 运行库，与 EXE 同目录。 |
-| `tls/trust.pem` | 服务端部署的 CA 证书和吊销列表。 |
+| `tls/trust.pem` | 服务端部署的公开 CA 证书和吊销列表，用于校验服务器。 |
 | `task_public.key` | 验证服务端任务签名的公钥。 |
-| `runtime-LICENSE.txt` | 随运行库分发的许可文件。 |
+| `runtime-LICENSE.txt`、`openssl-LICENSE.txt` | 随整合包分发的运行库许可文件。 |
 
 1. 解压客户端目录并双击 `client_gui.exe`。同机测试填 `127.0.0.1`，其他电脑填服务器当前可达的局域网 IPv4 地址或证书覆盖的 DNS 名。
 2. 端口默认填 `8888`。客户端首次登记也需要访问相邻端口 `8889`。两端需要网络互通，服务器防火墙允许这两个 TCP 端口。
 3. 填写客户端账号和口令，点「Log in and Connect」。客户端首次登录会自动生成本机设备密钥并完成登记。
 
 换网后服务器 IP 改变时，部署者需签发覆盖新地址的服务端证书。使用原 CA 续签并保持客户端版本兼容时，接收方只需替换 `tls/trust.pem`、重开客户端并填写新地址。客户端包只包含公开信任材料和任务公钥。服务器私钥、CA 私钥、账号库和本机设备身份留在各自设备上。
+
+## 本地生成的保密文件和运行数据
+
+服务器的 `data/runtime/`、本地发布目录 `releases/` 及客户端用户目录里的运行数据由各端自行维护。仓库里的下载包只分发公开的 `tls/trust.pem` 和 `task_public.key`，各部署实例使用自己生成的材料。
+
+| 本地路径 | 由哪一步生成 | 用途 |
+| --- | --- | --- |
+| `data/runtime/issuer/ca.key`、`tls/server.key` | `python -B server/provision.py init` 调用 OpenSSL 生成。`rotate server` 更换服务端证书和私钥。 | CA 私钥用于签发证书和吊销列表。服务端私钥用于建立 TLS 连接。旧私钥可能保存在 `issuer/retired/`。 |
+| `data/runtime/issuer/`、`tls/server.pem`、`tls/devices/` | `server/provision.py` 初始化签发目录、签发服务端证书。客户端首次登录时，`server/enrollment.py` 调用签发模块登记设备。 | 保存 CA 的签发和吊销状态、服务器证书以及已签发的设备证书。 |
+| `data/runtime/task_private_key.json` | `server/provision.py init` 调用 `server/rsa_keys.py` 首次生成。 | 服务端用它签名任务。对应的 `task_public.key` 可以放入客户端下载包。 |
+| `data/runtime/accounts.sqlite3` | `server/accounts.py` 初始化账号库。`server/provision.py account` 或控制中心「账号管理」创建账号。 | 保存账号角色、随机盐与 scrypt 口令派生值，以及已登记设备和会话摘要。 |
+| `data/runtime/tasks.sqlite3`、`runtime.log*`、`security_audit.jsonl` | `server/task_state.py`、`server/runtime_log.py`、`server/security_audit.py` 在服务运行和操作过程中写入。 | 恢复任务和信誉，保存结果、运行日志和安全审计。 |
+| `data/runtime/backups/` | `python -B release.py activate <版本>` 或 `rollback` 切换版本时由 `release.py` 生成。 | 保存升级前的数据库、密钥和签发记录，供恢复和对账。 |
+| `%LOCALAPPDATA%\Project13\Devices\*.key`、`*.pem`、`*.identity`、`*.storage` | 每台客户端首次登录时由 `client/device.c` 创建或保存，设备证书由服务器签发。 | 用于客户端双向 TLS 身份校验、节点身份恢复和本地结果加密。每台客户端用自己的设备文件。 |
+| `%LOCALAPPDATA%\Project13\*.pending`、`*.stale` | 客户端计算完成后，由 `client/outbox.c` 保存到磁盘。 | 使用设备的本地密钥加密待发和过期结果，支持断线补报和对账。 |
+
+公开信任包由 `server/provision.py init`、`rotate server` 或 `refresh-crl` 生成。吊销列表的有效期为 7 天。维护员更新吊销列表后需要同步更新下载包里的 `tls/trust.pem`。已下载的客户端也可直接替换该文件。
 
 ## 账号与窗口预览
 
@@ -74,7 +93,6 @@ python -B server/gui.py
 ```powershell
 python -B server/gui.py --check
 python -B server/security_tests.py
-python -B tests/acceptance.py --openssl '<OpenSSL.exe 的安装路径>'
 ```
 
-完整联调用隔离目录和模拟账号重新构建并签发测试证书。报告位于 `work/project13-verification`。当前协议、构建和部署以此 README、DEPLOYMENT.md、PROTOCOL.md 和新联调报告为准，旧版流程图与历史审计可用于回顾。
+现场验收步骤见 [部署和回滚说明](DEPLOYMENT.md#现场验收)。

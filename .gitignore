@@ -10,8 +10,14 @@ __pycache__/
 *.obj
 client/output/
 data/runtime/
-work/project13-verification/
 releases/
+
+# ===== 本地资料与验证目录 =====
+/work/
+/tests/
+/deliverables/
+/.vscode/
+/project13.code-workspace
 
 # ===== 运行时机密 =====
 client/credentials/
@@ -28,8 +34,3 @@ data/task_private_key.json
 Thumbs.db
 desktop.ini
 .DS_Store
-
-# ===== 编辑器 =====
-# .vscode/ 中的编译/调试配置建议提交；
-# 若不想提交本机路径相关的设置，取消下一行注释：
-# .vscode/settings.json
